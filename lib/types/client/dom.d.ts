@@ -1,6 +1,5 @@
 export declare const TURN_TAIL_SELECTOR = "[data-turn-tail]";
 export declare const TURN_FLOW_SELECTOR = "[data-chat-flow-kind=\"turn-tail\"]";
-export declare const SHARE_BUTTON_SELECTOR = "[data-dsh-share-button]";
 export interface TurnContent {
     prompts: HTMLElement[];
     answers: HTMLElement[];
@@ -11,6 +10,6 @@ export interface TurnContent {
  * 从 turn-tail 向前回溯到本轮 user 节点，同时收集 assistant-step、tool-call 和中途 steering。
  */
 export declare function findTurnContent(tail: HTMLElement): TurnContent | undefined;
-/** 找到复制、分支和时间所在的按钮行。 */
-export declare function findActionRow(tail: HTMLElement): HTMLElement | undefined;
+/** 从官方 assistant-actions 插槽渲染的按钮定位并收集当前轮内容。 */
+export declare function findTurnContentFromAction(action: HTMLElement): TurnContent | undefined;
 //# sourceMappingURL=dom.d.ts.map

@@ -9,7 +9,8 @@ describe('DSH 插件清单', () => {
       repository: { url: string }
       scripts: Record<string, string>
       license: string
-      dsh: { bundle: { patch: string }; client: { platform: string } }
+      dsh: { bundle: { patch: string }; client: { inject: string[]; platform: string } }
+      peerDependencies: Record<string, string>
     }
 
     expect(packageJson.exports).toHaveProperty('.')
@@ -21,6 +22,11 @@ describe('DSH 插件清单', () => {
     expect(packageJson.license).toBe('MIT')
     expect(packageJson.dsh.bundle.patch).toBe('./cordis.patch.yml')
     expect(packageJson.dsh.client.platform).toBe('web')
+    expect(packageJson.dsh.client.inject).toEqual([
+      '@deepseek-ai/dsh-client-runtime',
+      '@deepseek-ai/dsh-client-ui-conversation',
+    ])
+    expect(packageJson.peerDependencies.react).toBe('^18.2.0')
   })
 
   it('不依赖本机 DSH checkout 就能安装开发依赖', async () => {
@@ -37,5 +43,12 @@ describe('DSH 插件清单', () => {
   it('构建配置把图片渲染库内联到浏览器 bundle', async () => {
     const config = await readFile(new URL('../tsdown.config.ts', import.meta.url), 'utf8')
     expect(config).toContain("onlyBundle: ['html-to-image']")
+  })
+
+  it('README 说明正式插槽和剩余的 DOM 兼容边界', async () => {
+    const readme = await readFile(new URL('../README.md', import.meta.url), 'utf8')
+    expect(readme).toContain('conversation.chat.assistant-actions')
+    expect(readme).toContain('不再扫描或修改按钮栏 DOM')
+    expect(readme).not.toContain('暂时没有为消息操作区提供正式插件插槽')
   })
 })

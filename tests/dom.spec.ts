@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { describe, expect, it } from 'vitest'
-import { findActionRow, findTurnContent } from '../src/client/dom.ts'
+import { findTurnContent, findTurnContentFromAction } from '../src/client/dom.ts'
 
 function renderFixture(): HTMLElement {
   document.body.innerHTML = `
@@ -23,8 +23,13 @@ describe('DSH 对话 DOM 适配', () => {
     expect(content?.answers.map((item) => item.id)).toEqual(['answer-1', 'tool-call', 'answer-2'])
   })
 
-  it('找到 turn-tail 的操作按钮行', () => {
+  it('从官方操作插槽中的按钮找到当前轮内容', () => {
     const tail = renderFixture()
-    expect(findActionRow(tail)?.className).toBe('actions')
+    const action = document.createElement('button')
+    tail.querySelector('.actions')?.append(action)
+
+    const content = findTurnContentFromAction(action)
+    expect(content?.tail).toBe(tail)
+    expect(content?.answers.map(item => item.id)).toEqual(['answer-1', 'tool-call', 'answer-2'])
   })
 })

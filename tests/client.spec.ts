@@ -1,7 +1,13 @@
 // @vitest-environment jsdom
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { installShareButton } from '../src/client/index.ts'
+import {
+  apply,
+  createShareRuntime,
+  ShareAction,
+  type ShareActionProps,
+  type ShareRuntime,
+} from '../src/client/index.ts'
 
 function createMemoryStorage(): Storage {
   const entries = new Map<string, string>()
@@ -43,6 +49,18 @@ function addTurnWithProcess(id: string): HTMLElement {
   return root.querySelector(`[data-turn-tail="${id}"]`) as HTMLElement
 }
 
+function triggerShareAction(tail: HTMLElement, runtime: ShareRuntime, messageId = 'message-1'): HTMLButtonElement {
+  const button = document.createElement('button')
+  button.dataset.dshShareButton = ''
+  tail.lastElementChild?.append(button)
+  const action = ShareAction({ messageId, shareRuntime: runtime })
+  const { onClick } = action.props as {
+    onClick(event: { currentTarget: HTMLButtonElement }): void
+  }
+  onClick({ currentTarget: button })
+  return button
+}
+
 beforeEach(() => {
   document.documentElement.lang = 'zh-CN'
   Object.defineProperty(window, 'localStorage', {
@@ -63,40 +81,66 @@ afterEach(() => {
 })
 
 describe('分享按钮运行时', () => {
-  it('为已有和后来加入的对话各插入一个按钮，并在卸载时清理', async () => {
+  it('通过官方 assistant-actions 插槽注册按钮，并在卸载时清理', () => {
     addTurn('one')
-    const dispose = installShareButton(document, { renderImage: vi.fn() })
-    expect(document.querySelectorAll('[data-dsh-share-button]')).toHaveLength(1)
+    const disposeRegistration = vi.fn()
+    const injectionDisposers: Array<() => void> = []
+    const register = vi.fn(() => disposeRegistration)
+    const injectSlot = vi.fn((_name: string, callback: () => void | (() => void)) => {
+      const dispose = callback()
+      if (dispose) injectionDisposers.push(dispose)
+    })
+
+    apply({ slots: { inject: injectSlot, register } } as never)
+
+    expect(injectSlot).toHaveBeenCalledWith('conversation.chat.assistant-actions', expect.any(Function))
+    const [options, component] = register.mock.calls[0] as unknown as [
+      {
+        name: string
+        id: string
+        order: number
+        inject(): { shareRuntime: ShareRuntime }
+      },
+      (props: ShareActionProps) => ReturnType<typeof ShareAction>,
+    ]
+    expect(options).toMatchObject({
+      name: 'conversation.chat.assistant-actions',
+      id: 'share',
+      order: 20,
+    })
+
+    const runtime = options.inject().shareRuntime
+    const action = component({ messageId: 'message-one', shareRuntime: runtime })
+    expect(action.type).toBe('button')
+    expect(action.props).toMatchObject({
+      'data-dsh-share-button': '',
+      'aria-label': '将当前问答分享为图片',
+    })
+    // 按钮由 React 插槽渲染；插件不再自行扫描已有或后来加入的对话。
+    expect(document.querySelector('[data-dsh-share-button]')).toBeNull()
     const styleText = document.getElementById('dsh-share-style')?.textContent ?? ''
     expect(styleText).toContain('width: 960px')
     expect(styleText).toContain('max-height: 62vh')
     expect(styleText).not.toContain('max-height: 58vh')
+    expect(styleText).not.toContain('opacity: .72')
+    expect(styleText).not.toContain('margin-left: auto')
+    expect(document.querySelector('.dsh-share-dialog__controls')?.firstElementChild?.classList
+      .contains('dsh-share-dialog__toggle')).toBe(true)
 
     addTurn('two')
-    await vi.waitFor(() => expect(document.querySelectorAll('[data-dsh-share-button]')).toHaveLength(2))
-
-    document.documentElement.lang = 'zh-CN'
-    await vi.waitFor(() => {
-      expect(document.querySelector('[data-dsh-share-button]')?.getAttribute('aria-label')).toContain('分享')
-    })
-
-    dispose()
     expect(document.querySelector('[data-dsh-share-button]')).toBeNull()
+
+    injectionDisposers[0]?.()
+    expect(disposeRegistration).toHaveBeenCalledOnce()
     expect(document.querySelector('[data-dsh-share-dialog]')).toBeNull()
     expect(document.getElementById('dsh-share-style')).toBeNull()
   })
 
-  it('多个挂载者独立释放，重复调用 disposer 不会提前卸载', () => {
-    addTurn('lease')
-    const releaseOne = installShareButton(document)
-    const releaseTwo = installShareButton(document)
-
-    releaseOne()
-    releaseOne()
-    expect(document.querySelector('[data-dsh-share-button]')).not.toBeNull()
-
-    releaseTwo()
-    expect(document.querySelector('[data-dsh-share-button]')).toBeNull()
+  it('运行时重复释放不会报错', () => {
+    const runtime = createShareRuntime(document)
+    runtime.dispose()
+    runtime.dispose()
+    expect(document.querySelector('[data-dsh-share-dialog]')).toBeNull()
   })
 
   it('点击按钮后用当前问答生成图片并显示预览', async () => {
@@ -105,15 +149,14 @@ describe('分享按钮运行时', () => {
     Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: createObjectURL })
     Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: revokeObjectURL })
 
-    addTurn('click')
+    const tail = addTurn('click')
     const renderImage = vi.fn(async (element: HTMLElement) => {
       expect(element.textContent).toContain('问题 click')
       expect(element.textContent).toContain('回答 click')
       return new Blob(['png'], { type: 'image/png' })
     })
-    const dispose = installShareButton(document, { renderImage })
-
-    ;(document.querySelector('[data-dsh-share-button]') as HTMLButtonElement).click()
+    const runtime = createShareRuntime(document, { renderImage })
+    triggerShareAction(tail, runtime)
 
     await vi.waitFor(() => expect(renderImage).toHaveBeenCalledOnce())
     await vi.waitFor(() => {
@@ -123,7 +166,7 @@ describe('分享按钮运行时', () => {
       expect(image.style.width).toBe('768px')
     })
 
-    dispose()
+    runtime.dispose()
     expect(revokeObjectURL).toHaveBeenCalledWith('blob:dsh-share-preview')
   })
 
@@ -134,7 +177,7 @@ describe('分享按钮运行时', () => {
     })
     Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: vi.fn() })
 
-    addTurn('settings')
+    const tail = addTurn('settings')
     const renderedSettings: Array<{ width: string; fontSize: string }> = []
     const renderImage = vi.fn(async (element: HTMLElement) => {
       renderedSettings.push({
@@ -143,9 +186,8 @@ describe('分享按钮运行时', () => {
       })
       return new Blob(['png'], { type: 'image/png' })
     })
-    const dispose = installShareButton(document, { renderImage })
-
-    ;(document.querySelector('[data-dsh-share-button]') as HTMLButtonElement).click()
+    const runtime = createShareRuntime(document, { renderImage })
+    triggerShareAction(tail, runtime)
     await vi.waitFor(() => expect(renderImage).toHaveBeenCalledTimes(1))
     expect(renderedSettings[0]).toEqual({ width: '768px', fontSize: '16px' })
 
@@ -164,7 +206,7 @@ describe('分享按钮运行时', () => {
     expect(document.querySelector('[data-value="desktop"]')?.getAttribute('aria-pressed')).toBe('true')
     expect(document.querySelector('[data-value="large"]')?.getAttribute('aria-pressed')).toBe('true')
 
-    dispose()
+    runtime.dispose()
   })
 
   it('勾选不展示过程后隐藏 Think、工具调用和中间步骤', async () => {
@@ -174,15 +216,14 @@ describe('分享按钮运行时', () => {
     })
     Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: vi.fn() })
 
-    addTurnWithProcess('clean')
+    const tail = addTurnWithProcess('clean')
     const renderedContent: string[] = []
     const renderImage = vi.fn(async (element: HTMLElement) => {
       renderedContent.push(element.textContent ?? '')
       return new Blob(['png'], { type: 'image/png' })
     })
-    const dispose = installShareButton(document, { renderImage })
-
-    ;(document.querySelector('[data-dsh-share-button]') as HTMLButtonElement).click()
+    const runtime = createShareRuntime(document, { renderImage })
+    triggerShareAction(tail, runtime)
     await vi.waitFor(() => expect(renderImage).toHaveBeenCalledTimes(1))
     expect(renderedContent[0]).toContain('Think 中间步骤')
     expect(renderedContent[0]).toContain('Bash')
@@ -199,7 +240,7 @@ describe('分享按钮运行时', () => {
     expect(renderedContent[1]).not.toContain('中间说明')
     expect(window.localStorage.getItem('dsh-share.hide-process')).toBe('true')
 
-    dispose()
+    runtime.dispose()
   })
 
   it('更新预览时保留旧图，等新图解码后再原位替换', async () => {
@@ -220,11 +261,10 @@ describe('分享按钮运行时', () => {
       value: decode,
     })
 
-    addTurn('smooth')
+    const tail = addTurn('smooth')
     const renderImage = vi.fn(async () => new Blob(['png'], { type: 'image/png' }))
-    const dispose = installShareButton(document, { renderImage })
-
-    ;(document.querySelector('[data-dsh-share-button]') as HTMLButtonElement).click()
+    const runtime = createShareRuntime(document, { renderImage })
+    triggerShareAction(tail, runtime)
     const preview = document.querySelector('[data-dsh-share-preview]') as HTMLImageElement
     await vi.waitFor(() => expect(preview.src).toBe('blob:preview-1'))
     expect(preview.style.width).toBe('768px')
@@ -245,7 +285,7 @@ describe('分享按钮运行时', () => {
     await vi.waitFor(() => expect(revokeObjectURL).toHaveBeenCalledWith('blob:preview-1'))
     expect((document.querySelector('[data-dsh-share-copy]') as HTMLButtonElement).disabled).toBe(false)
 
-    dispose()
+    runtime.dispose()
     expect(revokeObjectURL).toHaveBeenCalledWith('blob:preview-2')
   })
 })

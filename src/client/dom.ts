@@ -1,6 +1,5 @@
 export const TURN_TAIL_SELECTOR = '[data-turn-tail]'
 export const TURN_FLOW_SELECTOR = '[data-chat-flow-kind="turn-tail"]'
-export const SHARE_BUTTON_SELECTOR = '[data-dsh-share-button]'
 
 export interface TurnContent {
   prompts: HTMLElement[]
@@ -43,10 +42,8 @@ export function findTurnContent(tail: HTMLElement): TurnContent | undefined {
   return { prompts, answers, tail }
 }
 
-/** 找到复制、分支和时间所在的按钮行。 */
-export function findActionRow(tail: HTMLElement): HTMLElement | undefined {
-  const candidate = tail.lastElementChild
-  if (!(candidate instanceof HTMLElement)) return undefined
-  if (!candidate.querySelector('button')) return undefined
-  return candidate
+/** 从官方 assistant-actions 插槽渲染的按钮定位并收集当前轮内容。 */
+export function findTurnContentFromAction(action: HTMLElement): TurnContent | undefined {
+  const tail = action.closest<HTMLElement>(TURN_TAIL_SELECTOR)
+  return tail ? findTurnContent(tail) : undefined
 }

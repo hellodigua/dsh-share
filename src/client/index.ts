@@ -1,10 +1,9 @@
 import { toBlob } from 'html-to-image'
+import { createElement, type MouseEvent as ReactMouseEvent, type ReactElement } from 'react'
 import { createShareCard } from './card.ts'
 import {
-  findActionRow,
   findTurnContent,
-  SHARE_BUTTON_SELECTOR,
-  TURN_TAIL_SELECTOR,
+  findTurnContentFromAction,
   type TurnContent,
 } from './dom.ts'
 import {
@@ -17,9 +16,21 @@ import {
 } from './settings.ts'
 
 export const name = '@dsh-external/dsh-share/client'
+export const inject = ['slots']
 
 interface ClientContext {
-  effect(callback: () => void | (() => void), label?: string): void
+  slots: {
+    inject(name: 'conversation.chat.assistant-actions', callback: () => void | (() => void)): void
+    register(
+      options: {
+        name: 'conversation.chat.assistant-actions'
+        id: string
+        order: number
+        inject: () => ShareRuntimeInjected
+      },
+      component: (props: ShareActionProps) => ReactElement,
+    ): () => void
+  }
 }
 
 const STYLE_ID = 'dsh-share-style'
@@ -39,7 +50,6 @@ const STYLE_TEXT = `
   height: 28px;
   justify-content: center;
   margin: 0;
-  opacity: .72;
   padding: 6px;
   width: 28px;
 }
@@ -109,7 +119,6 @@ const STYLE_TEXT = `
   display: inline-flex;
   font-size: 13px;
   gap: 7px;
-  margin-left: auto;
   user-select: none;
   white-space: nowrap;
 }
@@ -235,14 +244,6 @@ const STYLE_TEXT = `
   overflow: visible !important;
 }
 `
-
-const SHARE_ICON = `
-<svg aria-hidden="true" fill="none" height="16" viewBox="0 0 16 16" width="16" xmlns="http://www.w3.org/2000/svg">
-  <circle cx="4" cy="8" r="1.75" stroke="currentColor" stroke-width="1.4"/>
-  <circle cx="12" cy="4" r="1.75" stroke="currentColor" stroke-width="1.4"/>
-  <circle cx="12" cy="12" r="1.75" stroke="currentColor" stroke-width="1.4"/>
-  <path d="m5.55 7.23 4.9-2.45M5.55 8.77l4.9 2.45" stroke="currentColor" stroke-linecap="round" stroke-width="1.4"/>
-</svg>`
 
 export type ImageRenderer = (element: HTMLElement) => Promise<Blob>
 
@@ -386,6 +387,10 @@ class PreviewDialog {
         <button class="dsh-share-dialog__close" data-dsh-share-close type="button"></button>
       </div>
       <div class="dsh-share-dialog__controls">
+        <label class="dsh-share-dialog__toggle">
+          <input data-dsh-share-hide-process type="checkbox" />
+          <span data-dsh-share-hide-process-label></span>
+        </label>
         <div class="dsh-share-dialog__field">
           <span class="dsh-share-dialog__field-label" data-dsh-share-width-label></span>
           <div class="dsh-share-dialog__segmented" data-dsh-share-width role="group"></div>
@@ -394,10 +399,6 @@ class PreviewDialog {
           <span class="dsh-share-dialog__field-label" data-dsh-share-font-size-label></span>
           <div class="dsh-share-dialog__segmented" data-dsh-share-font-size role="group"></div>
         </div>
-        <label class="dsh-share-dialog__toggle">
-          <input data-dsh-share-hide-process type="checkbox" />
-          <span data-dsh-share-hide-process-label></span>
-        </label>
       </div>
       <div class="dsh-share-dialog__body">
         <p class="dsh-share-dialog__message" data-dsh-share-message role="status"></p>
@@ -665,20 +666,13 @@ class PreviewDialog {
   }
 }
 
-interface Runtime {
-  owners: number
+export interface ShareRuntime {
+  readonly document: Document
+  openFromAction(action: HTMLButtonElement): void
   dispose(): void
 }
 
-const installations = new WeakMap<Document, Runtime>()
-
-export function installShareButton(document: Document, options: InstallOptions = {}): () => void {
-  const current = installations.get(document)
-  if (current) {
-    current.owners += 1
-    return createRelease(document, current)
-  }
-
+export function createShareRuntime(document: Document, options: InstallOptions = {}): ShareRuntime {
   const style = document.createElement('style')
   style.id = STYLE_ID
   style.textContent = STYLE_TEXT
@@ -724,25 +718,11 @@ export function installShareButton(document: Document, options: InstallOptions =
     },
   })
 
-  const attach = (tail: HTMLElement): void => {
-    const row = findActionRow(tail)
-    if (!row) return
-
-    const existing = tail.querySelector<HTMLButtonElement>(SHARE_BUTTON_SELECTOR)
-    if (existing) {
-      existing.title = t(document).share
-      existing.ariaLabel = t(document).share
-      return
-    }
-
-    const button = document.createElement('button')
-    button.type = 'button'
-    button.dataset.dshShareButton = ''
-    button.innerHTML = SHARE_ICON
-    button.title = t(document).share
-    button.ariaLabel = t(document).share
-    button.addEventListener('click', () => {
-      const content = findTurnContent(tail)
+  let disposed = false
+  return {
+    document,
+    openFromAction: (button) => {
+      const content = findTurnContentFromAction(button)
       if (!content) {
         dialog.showError()
         return
@@ -750,76 +730,81 @@ export function installShareButton(document: Document, options: InstallOptions =
 
       activeContent = content
       void renderContent(content, button)
-    })
-
-    const lastNativeButton = Array.from(row.querySelectorAll<HTMLButtonElement>('button')).at(-1)
-    lastNativeButton?.insertAdjacentElement('afterend', button)
-  }
-
-  const scan = (root: ParentNode): void => {
-    if (root instanceof HTMLElement && root.matches(TURN_TAIL_SELECTOR)) attach(root)
-    for (const tail of root.querySelectorAll<HTMLElement>(TURN_TAIL_SELECTOR)) attach(tail)
-  }
-
-  const MutationObserverConstructor = document.defaultView?.MutationObserver
-  if (!MutationObserverConstructor) throw new Error('MutationObserver is unavailable')
-  const observer = new MutationObserverConstructor((mutations) => {
-    for (const mutation of mutations) {
-      if (mutation.type === 'attributes') {
-        scan(document)
-        continue
-      }
-      if (mutation.target instanceof HTMLElement) scan(mutation.target)
-      for (const node of mutation.addedNodes) {
-        if (node instanceof HTMLElement) scan(node)
-      }
-    }
-  })
-  observer.observe(document.documentElement, {
-    attributeFilter: ['lang'],
-    attributes: true,
-    childList: true,
-    subtree: true,
-  })
-  scan(document)
-
-  const runtime: Runtime = {
-    owners: 1,
+    },
     dispose: () => {
+      if (disposed) return
+      disposed = true
       activeContent = undefined
       renderEpoch += 1
-      observer.disconnect()
-      for (const button of document.querySelectorAll(SHARE_BUTTON_SELECTOR)) button.remove()
-      document.getElementById(STYLE_ID)?.remove()
+      style.remove()
       dialog.destroy()
     },
   }
-  installations.set(document, runtime)
-  return createRelease(document, runtime)
 }
 
-function createRelease(document: Document, runtime: Runtime): () => void {
-  let released = false
-  return () => {
-    if (released) return
-    released = true
-    release(document, runtime)
-  }
+interface ShareRuntimeInjected {
+  shareRuntime: ShareRuntime
 }
 
-function release(document: Document, runtime: Runtime): void {
-  runtime.owners -= 1
-  if (runtime.owners > 0) return
-  runtime.dispose()
-  installations.delete(document)
+export interface ShareActionProps extends ShareRuntimeInjected {
+  messageId: string
+}
+
+/** 官方 assistant-actions 插槽中的分享入口。 */
+export function ShareAction({ shareRuntime }: ShareActionProps): ReactElement {
+  const strings = t(shareRuntime.document)
+  return createElement(
+    'button',
+    {
+      type: 'button',
+      'data-dsh-share-button': '',
+      title: strings.share,
+      'aria-label': strings.share,
+      onClick: (event: ReactMouseEvent<HTMLButtonElement>) => {
+        shareRuntime.openFromAction(event.currentTarget)
+      },
+    },
+    createElement(
+      'svg',
+      {
+        'aria-hidden': true,
+        fill: 'none',
+        height: 16,
+        viewBox: '0 0 16 16',
+        width: 16,
+        xmlns: 'http://www.w3.org/2000/svg',
+      },
+      createElement('circle', { cx: 4, cy: 8, r: 1.75, stroke: 'currentColor', strokeWidth: 1.4 }),
+      createElement('circle', { cx: 12, cy: 4, r: 1.75, stroke: 'currentColor', strokeWidth: 1.4 }),
+      createElement('circle', { cx: 12, cy: 12, r: 1.75, stroke: 'currentColor', strokeWidth: 1.4 }),
+      createElement('path', {
+        d: 'm5.55 7.23 4.9-2.45M5.55 8.77l4.9 2.45',
+        stroke: 'currentColor',
+        strokeLinecap: 'round',
+        strokeWidth: 1.4,
+      }),
+    ),
+  )
 }
 
 export function apply(ctx: ClientContext): void {
-  ctx.effect(() => installShareButton(document), 'dsh-share: web UI')
+  ctx.slots.inject('conversation.chat.assistant-actions', () => {
+    const runtime = createShareRuntime(document)
+    const disposeRegistration = ctx.slots.register({
+      name: 'conversation.chat.assistant-actions',
+      id: 'share',
+      order: 20,
+      inject: () => ({ shareRuntime: runtime }),
+    }, ShareAction)
+    return () => {
+      disposeRegistration()
+      runtime.dispose()
+    }
+  })
 }
 
 export { createShareCard } from './card.ts'
-export { findActionRow, findTurnContent } from './dom.ts'
+export { findTurnContent, findTurnContentFromAction } from './dom.ts'
 export {
   DEFAULT_SHARE_SETTINGS,
   FONT_SIZE_PRESETS,
