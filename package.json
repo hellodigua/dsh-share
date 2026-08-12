@@ -3,6 +3,22 @@
   "version": "0.1.0",
   "private": true,
   "description": "Share a DSH conversation turn as a PNG image.",
+  "author": "digua <i@digua.me>",
+  "keywords": [
+    "deepseek-harness",
+    "dsh",
+    "plugin",
+    "share-image",
+    "screenshot"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hellodigua/dsh-share.git"
+  },
+  "homepage": "https://github.com/hellodigua/dsh-share#readme",
+  "bugs": {
+    "url": "https://github.com/hellodigua/dsh-share/issues"
+  },
   "type": "module",
   "main": "lib/index.js",
   "types": "lib/types/index.d.ts",
@@ -10,7 +26,8 @@
     "lib",
     "cordis.patch.yml",
     "LICENSE",
-    "README.md"
+    "README.md",
+    "THIRD_PARTY_LICENSES.md"
   ],
   "exports": {
     ".": {
@@ -27,7 +44,8 @@
     "build": "pnpm run clean && tsdown && tsc -p tsconfig.json",
     "clean": "node scripts/clean.mjs",
     "test": "vitest run",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "verify": "pnpm typecheck && pnpm test && pnpm build"
   },
   "dsh": {
     "bundle": {
@@ -37,11 +55,7 @@
       "platform": "web"
     }
   },
-  "peerDependencies": {
-    "@deepseek-ai/cordis": "*"
-  },
   "devDependencies": {
-    "@deepseek-ai/cordis": "link:../test-hellodigua/vendor/cordis",
     "@types/node": "^24.0.0",
     "html-to-image": "^1.11.13",
     "jsdom": "^26.1.0",
@@ -53,5 +67,5 @@
     "node": "^22.19.0 || >=24.0.0"
   },
   "packageManager": "pnpm@11.7.0",
-  "license": "BSD-3-Clause"
+  "license": "MIT"
 }

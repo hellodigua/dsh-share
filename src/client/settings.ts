@@ -8,8 +8,8 @@ export interface ShareSettings {
 
 export const WIDTH_PRESETS: Record<WidthPreset, number> = {
   phone: 375,
-  tablet: 520,
-  desktop: 640,
+  tablet: 768,
+  desktop: 1024,
 }
 
 export const FONT_SIZE_PRESETS: Record<FontSizePreset, number> = {
@@ -19,7 +19,7 @@ export const FONT_SIZE_PRESETS: Record<FontSizePreset, number> = {
 }
 
 export const DEFAULT_SHARE_SETTINGS: ShareSettings = {
-  width: 'phone',
+  width: 'tablet',
   fontSize: 'normal',
 }
 

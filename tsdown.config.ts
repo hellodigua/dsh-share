@@ -13,9 +13,6 @@ export default defineConfig([
     fixedExtension: false,
     dts: false,
     clean: false,
-    deps: {
-      neverBundle: ['@deepseek-ai/cordis'],
-    },
   },
   {
     name: `${PACKAGE_ID}/client`,

@@ -22,10 +22,10 @@ function createMemoryStorage(): Storage {
 }
 
 describe('分享图片设置', () => {
-  it('沿用 md2img 的宽度和字号预设', () => {
-    expect(WIDTH_PRESETS).toEqual({ phone: 375, tablet: 520, desktop: 640 })
+  it('提供手机、平板和电脑的宽度与字号预设', () => {
+    expect(WIDTH_PRESETS).toEqual({ phone: 375, tablet: 768, desktop: 1024 })
     expect(FONT_SIZE_PRESETS).toEqual({ normal: 16, large: 18, xlarge: 20 })
-    expect(DEFAULT_SHARE_SETTINGS).toEqual({ width: 'phone', fontSize: 'normal' })
+    expect(DEFAULT_SHARE_SETTINGS).toEqual({ width: 'tablet', fontSize: 'normal' })
   })
 
   it('保存有效偏好，并忽略无效的历史值', () => {

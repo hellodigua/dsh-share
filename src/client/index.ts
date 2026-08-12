@@ -1,4 +1,3 @@
-import type { Context } from '@deepseek-ai/cordis'
 import { toBlob } from 'html-to-image'
 import { createShareCard } from './card.ts'
 import {
@@ -11,6 +10,7 @@ import {
 import {
   loadShareSettings,
   saveShareSettings,
+  WIDTH_PRESETS,
   type FontSizePreset,
   type ShareSettings,
   type WidthPreset,
@@ -18,7 +18,13 @@ import {
 
 export const name = '@dsh-external/dsh-share/client'
 
+interface ClientContext {
+  effect(callback: () => void | (() => void), label?: string): void
+}
+
 const STYLE_ID = 'dsh-share-style'
+const TRANSPARENT_IMAGE_PLACEHOLDER =
+  'data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs='
 
 const STYLE_TEXT = `
 [data-dsh-share-button] {
@@ -50,10 +56,12 @@ const STYLE_TEXT = `
   box-shadow: 0 20px 64px rgba(0, 0, 0, .24);
   color: var(--dsw-alias-label-primary, #111827);
   max-height: min(86vh, 900px);
-  max-width: min(820px, calc(100vw - 32px));
+  max-width: calc(100vw - 32px);
+  overflow: hidden;
   padding: 0;
-  width: 760px;
+  width: 960px;
 }
+[data-dsh-share-dialog][open] { display: flex; flex-direction: column; }
 [data-dsh-share-dialog]::backdrop { background: rgba(0, 0, 0, .48); }
 .dsh-share-dialog__header {
   align-items: center;
@@ -120,22 +128,28 @@ const STYLE_TEXT = `
   color: var(--dsw-alias-label-primary, #111827);
 }
 .dsh-share-dialog__body {
-  align-items: center;
-  display: flex;
-  justify-content: center;
+  align-items: start;
+  display: grid;
+  flex: 1 1 auto;
+  justify-items: center;
+  max-height: 62vh;
   min-height: 220px;
+  min-width: 0;
   overflow: auto;
   padding: 18px;
 }
 .dsh-share-dialog__preview {
   border: 1px solid var(--dsw-alias-line-border, rgba(127, 127, 127, .18));
+  box-sizing: border-box;
   display: block;
   height: auto;
-  max-height: 58vh;
   max-width: 100%;
-  object-fit: contain;
 }
-.dsh-share-dialog__message { color: var(--dsw-alias-label-secondary, #6b7280); text-align: center; }
+.dsh-share-dialog__message {
+  align-self: center;
+  color: var(--dsw-alias-label-secondary, #6b7280);
+  text-align: center;
+}
 .dsh-share-dialog__footer {
   align-items: center;
   border-top: 1px solid var(--dsw-alias-line-border, rgba(127, 127, 127, .18));
@@ -228,6 +242,8 @@ interface Translation {
   copyUnsupported: string
   copyFailed: string
   renderFailed: string
+  updating: string
+  updateFailed: string
   close: string
   width: string
   fontSize: string
@@ -255,6 +271,8 @@ function t(document: Document): Translation {
       copyUnsupported: '当前浏览器不支持复制图片，请下载 PNG。',
       copyFailed: '复制失败，请下载 PNG。',
       renderFailed: '图片生成失败，请稍后重试。',
+      updating: '正在更新预览…',
+      updateFailed: '更新失败，当前仍为上一张预览。',
       close: '关闭',
       width: '宽度',
       fontSize: '字号',
@@ -276,6 +294,8 @@ function t(document: Document): Translation {
     copyUnsupported: 'Image clipboard is unavailable. Please download the PNG.',
     copyFailed: 'Could not copy the image. Please download the PNG.',
     renderFailed: 'Could not generate the image. Please try again.',
+    updating: 'Updating preview…',
+    updateFailed: 'Update failed. The previous preview is still shown.',
     close: 'Close',
     width: 'Width',
     fontSize: 'Size',
@@ -291,7 +311,7 @@ function t(document: Document): Translation {
 export async function renderShareImage(element: HTMLElement): Promise<Blob> {
   const blob = await toBlob(element, {
     backgroundColor: getComputedStyle(element).backgroundColor,
-    cacheBust: true,
+    imagePlaceholder: TRANSPARENT_IMAGE_PLACEHOLDER,
     pixelRatio: 2,
     skipFonts: true,
   })
@@ -423,31 +443,79 @@ class PreviewDialog {
     return { ...this.currentSettings }
   }
 
-  showLoading(): void {
+  showLoading(preservePreview = false): void {
     const strings = t(this.document)
+    const canPreserve = preservePreview && this.blob !== undefined && this.objectUrl !== undefined
+    this.element.ariaBusy = 'true'
+    this.copyButton.disabled = true
+    this.downloadButton.disabled = true
+
+    if (canPreserve) {
+      this.message.hidden = true
+      this.image.hidden = false
+      this.status.textContent = strings.updating
+      this.open()
+      return
+    }
+
     this.clearResult()
     this.message.hidden = false
     this.message.textContent = strings.loading
     this.image.hidden = true
     this.status.textContent = ''
-    this.copyButton.disabled = true
-    this.downloadButton.disabled = true
     this.open()
   }
 
-  showResult(blob: Blob): void {
-    this.clearResult()
+  /** 先在独立 img 中完成解码，再原位替换当前预览，避免出现空白帧。 */
+  async showResult(blob: Blob, isCurrent: () => boolean = () => true): Promise<boolean> {
+    const nextObjectUrl = URL.createObjectURL(blob)
+    try {
+      const preloader = this.document.createElement('img')
+      preloader.src = nextObjectUrl
+      if (typeof preloader.decode === 'function') await preloader.decode()
+      else await this.waitForImage(preloader)
+
+      if (!isCurrent()) {
+        URL.revokeObjectURL(nextObjectUrl)
+        return false
+      }
+    } catch (error) {
+      URL.revokeObjectURL(nextObjectUrl)
+      throw error
+    }
+
+    const previousObjectUrl = this.objectUrl
     this.blob = blob
-    this.objectUrl = URL.createObjectURL(blob)
-    this.image.src = this.objectUrl
+    this.objectUrl = nextObjectUrl
+    this.image.src = nextObjectUrl
+    this.image.style.width = `${WIDTH_PRESETS[this.currentSettings.width]}px`
     this.image.hidden = false
     this.message.hidden = true
+    this.status.textContent = ''
+    this.element.ariaBusy = 'false'
     this.copyButton.disabled = false
     this.downloadButton.disabled = false
+
+    // 新图已进入解码缓存；延后一帧释放旧 URL，保证浏览器完成原位绘制。
+    await this.nextFrame()
+    if (previousObjectUrl) URL.revokeObjectURL(previousObjectUrl)
+    return true
   }
 
-  showError(): void {
+  showError(preservePreview = false): void {
     const strings = t(this.document)
+    const canPreserve = preservePreview && this.blob !== undefined && this.objectUrl !== undefined
+    this.element.ariaBusy = 'false'
+    if (canPreserve) {
+      this.message.hidden = true
+      this.image.hidden = false
+      this.status.textContent = strings.updateFailed
+      this.copyButton.disabled = false
+      this.downloadButton.disabled = false
+      this.open()
+      return
+    }
+
     this.clearResult()
     this.message.hidden = false
     this.message.textContent = strings.renderFailed
@@ -455,6 +523,19 @@ class PreviewDialog {
     this.copyButton.disabled = true
     this.downloadButton.disabled = true
     this.open()
+  }
+
+  private waitForImage(image: HTMLImageElement): Promise<void> {
+    return new Promise((resolve, reject) => {
+      image.addEventListener('load', () => resolve(), { once: true })
+      image.addEventListener('error', () => reject(new Error('Failed to decode preview image')), { once: true })
+    })
+  }
+
+  private nextFrame(): Promise<void> {
+    const requestFrame = this.document.defaultView?.requestAnimationFrame
+    if (!requestFrame) return Promise.resolve()
+    return new Promise(resolve => requestFrame(() => resolve()))
   }
 
   destroy(): void {
@@ -516,6 +597,7 @@ class PreviewDialog {
     this.objectUrl = undefined
     this.image.removeAttribute('src')
     this.status.textContent = ''
+    this.element.ariaBusy = 'false'
   }
 
   private async copy(): Promise<void> {
@@ -570,18 +652,24 @@ export function installShareButton(document: Document, options: InstallOptions =
   let renderEpoch = 0
   let dialog: PreviewDialog
 
-  const renderContent = async (content: TurnContent, sourceButton?: HTMLButtonElement): Promise<void> => {
+  const renderContent = async (
+    content: TurnContent,
+    sourceButton?: HTMLButtonElement,
+    preservePreview = false,
+  ): Promise<void> => {
     const epoch = ++renderEpoch
     if (sourceButton) sourceButton.disabled = true
-    dialog.showLoading()
+    dialog.showLoading(preservePreview)
     const card = createShareCard(document, content, getLocale(document), dialog.settings)
     try {
       const blob = await renderImage(card.element)
-      if (epoch === renderEpoch) dialog.showResult(blob)
+      if (epoch === renderEpoch) {
+        await dialog.showResult(blob, () => epoch === renderEpoch)
+      }
     } catch (error) {
       if (epoch === renderEpoch) {
         console.warn('[dsh-share] Failed to render conversation image', error)
-        dialog.showError()
+        dialog.showError(preservePreview)
       }
     } finally {
       card.dispose()
@@ -591,7 +679,7 @@ export function installShareButton(document: Document, options: InstallOptions =
 
   dialog = new PreviewDialog(document, {
     onSettingsChange: () => {
-      if (activeContent) void renderContent(activeContent)
+      if (activeContent) void renderContent(activeContent, undefined, true)
     },
     onDismiss: () => {
       activeContent = undefined
@@ -689,7 +777,7 @@ function release(document: Document, runtime: Runtime): void {
   installations.delete(document)
 }
 
-export function apply(ctx: Context): void {
+export function apply(ctx: ClientContext): void {
   ctx.effect(() => installShareButton(document), 'dsh-share: web UI')
 }
 

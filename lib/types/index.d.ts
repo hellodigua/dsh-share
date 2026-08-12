@@ -1,4 +1,3 @@
-import type { Context } from '@deepseek-ai/cordis';
 export declare const name = "@dsh-external/dsh-share";
-export declare function apply(_ctx: Context): void;
+export declare function apply(_ctx: unknown): void;
 //# sourceMappingURL=index.d.ts.map

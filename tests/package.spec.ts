@@ -6,14 +6,27 @@ describe('DSH 插件清单', () => {
     const packageJson = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8')) as {
       exports: Record<string, unknown>
       files: string[]
+      repository: { url: string }
+      scripts: Record<string, string>
+      license: string
       dsh: { bundle: { patch: string }; client: { platform: string } }
     }
 
     expect(packageJson.exports).toHaveProperty('.')
     expect(packageJson.exports).toHaveProperty('./client')
     expect(packageJson.files).toContain('cordis.patch.yml')
+    expect(packageJson.files).toContain('THIRD_PARTY_LICENSES.md')
+    expect(packageJson.repository.url).toBe('git+https://github.com/hellodigua/dsh-share.git')
+    expect(packageJson.scripts.verify).toContain('pnpm typecheck')
+    expect(packageJson.license).toBe('MIT')
     expect(packageJson.dsh.bundle.patch).toBe('./cordis.patch.yml')
     expect(packageJson.dsh.client.platform).toBe('web')
+  })
+
+  it('不依赖本机 DSH checkout 就能安装开发依赖', async () => {
+    const packageJson = await readFile(new URL('../package.json', import.meta.url), 'utf8')
+    expect(packageJson).not.toContain('link:../')
+    expect(packageJson).not.toContain('file:/Users/')
   })
 
   it('bundle patch 使用 DSH 所需的 insert 数组格式', async () => {

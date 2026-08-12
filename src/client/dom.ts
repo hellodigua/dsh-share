@@ -10,7 +10,7 @@ export interface TurnContent {
 
 /**
  * 这里集中保存当前 DSH 页面结构的假设，方便上游 DOM 调整后只改一个地方。
- * 从 turn-tail 向前回溯到本轮 user 节点，同时收集 assistant-step 和中途 steering。
+ * 从 turn-tail 向前回溯到本轮 user 节点，同时收集 assistant-step、tool-call 和中途 steering。
  */
 export function findTurnContent(tail: HTMLElement): TurnContent | undefined {
   const flowTail = tail.closest<HTMLElement>(TURN_FLOW_SELECTOR)
@@ -24,7 +24,7 @@ export function findTurnContent(tail: HTMLElement): TurnContent | undefined {
   while (sibling instanceof HTMLElement) {
     const kind = sibling.dataset.chatFlowKind
 
-    if (kind === 'assistant-step') {
+    if (kind === 'assistant-step' || kind === 'tool-call') {
       answers.unshift(sibling)
     } else if (kind === 'steering') {
       prompts.unshift(sibling)

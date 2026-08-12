@@ -8,7 +8,7 @@ export interface TurnContent {
 }
 /**
  * 这里集中保存当前 DSH 页面结构的假设，方便上游 DOM 调整后只改一个地方。
- * 从 turn-tail 向前回溯到本轮 user 节点，同时收集 assistant-step 和中途 steering。
+ * 从 turn-tail 向前回溯到本轮 user 节点，同时收集 assistant-step、tool-call 和中途 steering。
  */
 export declare function findTurnContent(tail: HTMLElement): TurnContent | undefined;
 /** 找到复制、分支和时间所在的按钮行。 */
