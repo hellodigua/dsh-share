@@ -1,4 +1,5 @@
 import { toBlob } from 'html-to-image'
+import { IconShareOutline16, Tooltip } from '@deepseek-ai/dsh-client-ui-primitives'
 import { createElement, type MouseEvent as ReactMouseEvent, type ReactElement } from 'react'
 import { createShareCard } from './card.ts'
 import {
@@ -53,6 +54,9 @@ const STYLE_TEXT = `
   padding: 6px;
   width: 28px;
 }
+/* 官方 slot 固定在分支按钮前；只调整 flex 视觉顺序，不移动 React 管理的 DOM。 */
+[data-dsh-share-button] { order: 1; }
+[data-dsh-share-button] ~ span { order: 2; }
 [data-dsh-share-button]:hover {
   background: var(--dsw-alias-interactive-bg-hover, rgba(127, 127, 127, .12));
   color: var(--dsw-alias-label-secondary, currentColor);
@@ -119,6 +123,7 @@ const STYLE_TEXT = `
   display: inline-flex;
   font-size: 13px;
   gap: 7px;
+  margin-left: auto;
   user-select: none;
   white-space: nowrap;
 }
@@ -254,6 +259,7 @@ export interface InstallOptions {
 interface Translation {
   title: string
   share: string
+  shareTooltip: string
   loading: string
   copy: string
   download: string
@@ -284,6 +290,7 @@ function t(document: Document): Translation {
     return {
       title: '分享当前问答',
       share: '将当前问答分享为图片',
+      shareTooltip: '分享为图片',
       loading: '正在生成图片…',
       copy: '复制图片',
       download: '下载 PNG',
@@ -308,6 +315,7 @@ function t(document: Document): Translation {
   return {
     title: 'Share this Q&A',
     share: 'Share this Q&A as an image',
+    shareTooltip: 'Share as image',
     loading: 'Generating image…',
     copy: 'Copy image',
     download: 'Download PNG',
@@ -387,10 +395,6 @@ class PreviewDialog {
         <button class="dsh-share-dialog__close" data-dsh-share-close type="button"></button>
       </div>
       <div class="dsh-share-dialog__controls">
-        <label class="dsh-share-dialog__toggle">
-          <input data-dsh-share-hide-process type="checkbox" />
-          <span data-dsh-share-hide-process-label></span>
-        </label>
         <div class="dsh-share-dialog__field">
           <span class="dsh-share-dialog__field-label" data-dsh-share-width-label></span>
           <div class="dsh-share-dialog__segmented" data-dsh-share-width role="group"></div>
@@ -399,6 +403,10 @@ class PreviewDialog {
           <span class="dsh-share-dialog__field-label" data-dsh-share-font-size-label></span>
           <div class="dsh-share-dialog__segmented" data-dsh-share-font-size role="group"></div>
         </div>
+        <label class="dsh-share-dialog__toggle">
+          <input data-dsh-share-hide-process type="checkbox" />
+          <span data-dsh-share-hide-process-label></span>
+        </label>
       </div>
       <div class="dsh-share-dialog__body">
         <p class="dsh-share-dialog__message" data-dsh-share-message role="status"></p>
@@ -753,38 +761,18 @@ export interface ShareActionProps extends ShareRuntimeInjected {
 /** 官方 assistant-actions 插槽中的分享入口。 */
 export function ShareAction({ shareRuntime }: ShareActionProps): ReactElement {
   const strings = t(shareRuntime.document)
-  return createElement(
-    'button',
+  const button = createElement('button',
     {
       type: 'button',
       'data-dsh-share-button': '',
-      title: strings.share,
       'aria-label': strings.share,
       onClick: (event: ReactMouseEvent<HTMLButtonElement>) => {
         shareRuntime.openFromAction(event.currentTarget)
       },
     },
-    createElement(
-      'svg',
-      {
-        'aria-hidden': true,
-        fill: 'none',
-        height: 16,
-        viewBox: '0 0 16 16',
-        width: 16,
-        xmlns: 'http://www.w3.org/2000/svg',
-      },
-      createElement('circle', { cx: 4, cy: 8, r: 1.75, stroke: 'currentColor', strokeWidth: 1.4 }),
-      createElement('circle', { cx: 12, cy: 4, r: 1.75, stroke: 'currentColor', strokeWidth: 1.4 }),
-      createElement('circle', { cx: 12, cy: 12, r: 1.75, stroke: 'currentColor', strokeWidth: 1.4 }),
-      createElement('path', {
-        d: 'm5.55 7.23 4.9-2.45M5.55 8.77l4.9 2.45',
-        stroke: 'currentColor',
-        strokeLinecap: 'round',
-        strokeWidth: 1.4,
-      }),
-    ),
+    createElement(IconShareOutline16, { size: 16 }),
   )
+  return createElement(Tooltip, { label: strings.shareTooltip, side: 'bottom', children: button })
 }
 
 export function apply(ctx: ClientContext): void {

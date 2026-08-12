@@ -26,6 +26,7 @@ export default defineConfig([
     clean: false,
     deps: {
       onlyBundle: ['html-to-image'],
+      neverBundle: ['react', '@deepseek-ai/dsh-client-ui-primitives'],
     },
     outputOptions: {
       entryFileNames: 'client.js',

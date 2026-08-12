@@ -25,6 +25,7 @@ describe('DSH 插件清单', () => {
     expect(packageJson.dsh.client.inject).toEqual([
       '@deepseek-ai/dsh-client-runtime',
       '@deepseek-ai/dsh-client-ui-conversation',
+      '@deepseek-ai/dsh-client-ui-primitives',
     ])
     expect(packageJson.peerDependencies.react).toBe('^18.2.0')
   })
@@ -43,6 +44,7 @@ describe('DSH 插件清单', () => {
   it('构建配置把图片渲染库内联到浏览器 bundle', async () => {
     const config = await readFile(new URL('../tsdown.config.ts', import.meta.url), 'utf8')
     expect(config).toContain("onlyBundle: ['html-to-image']")
+    expect(config).toContain("neverBundle: ['react', '@deepseek-ai/dsh-client-ui-primitives']")
   })
 
   it('README 说明正式插槽和剩余的 DOM 兼容边界', async () => {

@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { IconShareOutline16 } from '@deepseek-ai/dsh-client-ui-primitives'
 import {
   apply,
   createShareRuntime,
@@ -54,7 +55,8 @@ function triggerShareAction(tail: HTMLElement, runtime: ShareRuntime, messageId 
   button.dataset.dshShareButton = ''
   tail.lastElementChild?.append(button)
   const action = ShareAction({ messageId, shareRuntime: runtime })
-  const { onClick } = action.props as {
+  const { children } = action.props as { children: ReturnType<typeof ShareAction> }
+  const { onClick } = children.props as {
     onClick(event: { currentTarget: HTMLButtonElement }): void
   }
   onClick({ currentTarget: button })
@@ -111,11 +113,21 @@ describe('分享按钮运行时', () => {
 
     const runtime = options.inject().shareRuntime
     const action = component({ messageId: 'message-one', shareRuntime: runtime })
-    expect(action.type).toBe('button')
     expect(action.props).toMatchObject({
+      label: '分享为图片',
+      side: 'bottom',
+    })
+    const tooltipProps = action.props as { children: ReturnType<typeof ShareAction> }
+    expect(tooltipProps.children.type).toBe('button')
+    expect(tooltipProps.children.props).toMatchObject({
       'data-dsh-share-button': '',
       'aria-label': '将当前问答分享为图片',
     })
+    expect(tooltipProps.children.props.children).toMatchObject({
+      type: IconShareOutline16,
+      props: { size: 16 },
+    })
+    expect(tooltipProps.children.props).not.toHaveProperty('title')
     // 按钮由 React 插槽渲染；插件不再自行扫描已有或后来加入的对话。
     expect(document.querySelector('[data-dsh-share-button]')).toBeNull()
     const styleText = document.getElementById('dsh-share-style')?.textContent ?? ''
@@ -123,8 +135,10 @@ describe('分享按钮运行时', () => {
     expect(styleText).toContain('max-height: 62vh')
     expect(styleText).not.toContain('max-height: 58vh')
     expect(styleText).not.toContain('opacity: .72')
-    expect(styleText).not.toContain('margin-left: auto')
-    expect(document.querySelector('.dsh-share-dialog__controls')?.firstElementChild?.classList
+    expect(styleText).toContain('margin-left: auto')
+    expect(styleText).toContain('[data-dsh-share-button] { order: 1; }')
+    expect(styleText).toContain('[data-dsh-share-button] ~ span { order: 2; }')
+    expect(document.querySelector('.dsh-share-dialog__controls')?.lastElementChild?.classList
       .contains('dsh-share-dialog__toggle')).toBe(true)
 
     addTurn('two')
@@ -136,11 +150,40 @@ describe('分享按钮运行时', () => {
     expect(document.getElementById('dsh-share-style')).toBeNull()
   })
 
+  it('英文界面的 Tooltip 使用 Share as image 文案', () => {
+    document.documentElement.lang = 'en'
+    const runtime = createShareRuntime(document)
+    const action = ShareAction({ messageId: 'message-en', shareRuntime: runtime })
+
+    expect(action.props.label).toBe('Share as image')
+    expect(action.props.children.props['aria-label']).toBe('Share this Q&A as an image')
+
+    runtime.dispose()
+  })
+
   it('运行时重复释放不会报错', () => {
     const runtime = createShareRuntime(document)
     runtime.dispose()
     runtime.dispose()
     expect(document.querySelector('[data-dsh-share-dialog]')).toBeNull()
+  })
+
+  it('把分享按钮显示在分支右侧，并保持时间信息在最后', () => {
+    const runtime = createShareRuntime(document)
+    const row = document.createElement('div')
+    row.style.display = 'flex'
+    row.innerHTML = `
+      <button data-copy></button>
+      <button data-dsh-share-button></button>
+      <button data-branch></button>
+      <span data-clock></span>`
+    document.body.append(row)
+
+    expect(getComputedStyle(row.querySelector('[data-branch]') as HTMLElement).order).toBe('')
+    expect(getComputedStyle(row.querySelector('[data-dsh-share-button]') as HTMLElement).order).toBe('1')
+    expect(getComputedStyle(row.querySelector('[data-clock]') as HTMLElement).order).toBe('2')
+
+    runtime.dispose()
   })
 
   it('点击按钮后用当前问答生成图片并显示预览', async () => {
