@@ -71,13 +71,23 @@ function cloneToolCallSummary(
   return clone
 }
 
-function cloneMessage(source: HTMLElement, locale: 'zh' | 'en'): HTMLElement {
+function cloneMessage(
+  source: HTMLElement,
+  locale: 'zh' | 'en',
+  hideReasoning = false,
+): HTMLElement {
   if (source.dataset.chatFlowKind === 'tool-call') {
     return cloneToolCallSummary(source, locale)
   }
 
   const clone = source.cloneNode(true) as HTMLElement
   clone.dataset.dshShareMessage = ''
+
+  if (hideReasoning) {
+    for (const reasoning of clone.querySelectorAll<HTMLElement>('[data-variant="think"]')) {
+      reasoning.remove()
+    }
+  }
 
   // 删除 hover 操作区，避免复制、分支和本插件按钮出现在分享图里。
   for (const hoverRoot of clone.querySelectorAll<HTMLElement>('[data-time-hover-root]')) {
@@ -179,7 +189,14 @@ export function createShareCard(
   card.append(promptSection)
 
   const answerSection = document.createElement('section')
-  for (const answer of content.answers) answerSection.append(cloneMessage(answer, locale))
+  // 隐藏过程时只保留最后一个 assistant-step，并从中移除 Think；工具调用和
+  // 中间步骤都不会进入图片，但用户在过程中的补充信息仍作为提问保留。
+  const answers = settings.hideProcess
+    ? content.answers.filter(answer => answer.dataset.chatFlowKind === 'assistant-step').slice(-1)
+    : content.answers
+  for (const answer of answers) {
+    answerSection.append(cloneMessage(answer, locale, settings.hideProcess))
+  }
   card.append(answerSection)
 
   const footer = document.createElement('footer')

@@ -101,6 +101,44 @@ describe('分享图片卡片', () => {
     card.dispose()
   })
 
+  it('隐藏过程时只保留最终回答，并移除其中的 Think', () => {
+    const prompt = document.createElement('div')
+    prompt.dataset.chatFlowKind = 'user'
+    prompt.textContent = '用户问题'
+
+    const intermediate = document.createElement('div')
+    intermediate.dataset.chatFlowKind = 'assistant-step'
+    intermediate.innerHTML = '<div data-variant="think">Think 一</div><p>正在处理</p>'
+
+    const toolCall = document.createElement('div')
+    toolCall.dataset.chatFlowKind = 'tool-call'
+    toolCall.innerHTML = '<div data-disclosure-row><span>Bash</span><span>pnpm test</span></div>'
+
+    const finalAnswer = document.createElement('div')
+    finalAnswer.dataset.chatFlowKind = 'assistant-step'
+    finalAnswer.innerHTML = '<div data-variant="think">Think 二</div><article>最终回答</article>'
+
+    const content: TurnContent = {
+      prompts: [prompt],
+      answers: [intermediate, toolCall, finalAnswer],
+      tail: document.createElement('div'),
+    }
+    const card = createShareCard(document, content, 'zh', {
+      width: 'tablet',
+      fontSize: 'normal',
+      hideProcess: true,
+    })
+
+    expect(card.element.textContent).toContain('用户问题')
+    expect(card.element.textContent).toContain('最终回答')
+    expect(card.element.textContent).not.toContain('正在处理')
+    expect(card.element.textContent).not.toContain('Think')
+    expect(card.element.textContent).not.toContain('Bash')
+    expect(card.element.querySelector('[data-variant="think"]')).toBeNull()
+    expect(card.element.querySelector('[data-dsh-share-tool-call]')).toBeNull()
+    card.dispose()
+  })
+
   it('按预设设置图片宽度和正文基准字号', () => {
     const prompt = document.createElement('div')
     prompt.textContent = '问题'
@@ -108,7 +146,11 @@ describe('分享图片卡片', () => {
     answer.textContent = '回答'
     const content: TurnContent = { prompts: [prompt], answers: [answer], tail: document.createElement('div') }
 
-    const card = createShareCard(document, content, 'zh', { width: 'tablet', fontSize: 'large' })
+    const card = createShareCard(document, content, 'zh', {
+      width: 'tablet',
+      fontSize: 'large',
+      hideProcess: false,
+    })
 
     expect(card.element.style.width).toBe('768px')
     expect(card.element.style.getPropertyValue('--dsh-share-font-size')).toBe('18px')

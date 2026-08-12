@@ -3,6 +3,7 @@ export type FontSizePreset = 'normal' | 'large' | 'xlarge';
 export interface ShareSettings {
     width: WidthPreset;
     fontSize: FontSizePreset;
+    hideProcess: boolean;
 }
 export declare const WIDTH_PRESETS: Record<WidthPreset, number>;
 export declare const FONT_SIZE_PRESETS: Record<FontSizePreset, number>;

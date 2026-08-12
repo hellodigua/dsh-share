@@ -25,6 +25,24 @@ function addTurn(id: string): HTMLElement {
   return root.querySelector(`[data-turn-tail="${id}"]`) as HTMLElement
 }
 
+function addTurnWithProcess(id: string): HTMLElement {
+  const root = document.createElement('div')
+  root.innerHTML = `
+    <div data-chat-flow-kind="user"><p>问题 ${id}</p></div>
+    <div data-chat-flow-kind="assistant-step">
+      <div data-variant="think">Think 中间步骤</div><p>中间说明</p>
+    </div>
+    <div data-chat-flow-kind="tool-call">
+      <div data-disclosure-row><span>Bash</span><span>pnpm test</span></div>
+    </div>
+    <div data-chat-flow-kind="assistant-step">
+      <div data-variant="think">Think 最终步骤</div><article><p>最终回答 ${id}</p></article>
+    </div>
+    <div data-chat-flow-kind="turn-tail"><div data-turn-tail="${id}"><div><button>复制</button><button>分支</button></div></div></div>`
+  document.body.append(root)
+  return root.querySelector(`[data-turn-tail="${id}"]`) as HTMLElement
+}
+
 beforeEach(() => {
   document.documentElement.lang = 'zh-CN'
   Object.defineProperty(window, 'localStorage', {
@@ -145,6 +163,41 @@ describe('分享按钮运行时', () => {
     expect(window.localStorage.getItem('dsh-share.font-size')).toBe('large')
     expect(document.querySelector('[data-value="desktop"]')?.getAttribute('aria-pressed')).toBe('true')
     expect(document.querySelector('[data-value="large"]')?.getAttribute('aria-pressed')).toBe('true')
+
+    dispose()
+  })
+
+  it('勾选不展示过程后隐藏 Think、工具调用和中间步骤', async () => {
+    Object.defineProperty(URL, 'createObjectURL', {
+      configurable: true,
+      value: vi.fn(() => `blob:dsh-share-${Math.random()}`),
+    })
+    Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: vi.fn() })
+
+    addTurnWithProcess('clean')
+    const renderedContent: string[] = []
+    const renderImage = vi.fn(async (element: HTMLElement) => {
+      renderedContent.push(element.textContent ?? '')
+      return new Blob(['png'], { type: 'image/png' })
+    })
+    const dispose = installShareButton(document, { renderImage })
+
+    ;(document.querySelector('[data-dsh-share-button]') as HTMLButtonElement).click()
+    await vi.waitFor(() => expect(renderImage).toHaveBeenCalledTimes(1))
+    expect(renderedContent[0]).toContain('Think 中间步骤')
+    expect(renderedContent[0]).toContain('Bash')
+
+    const toggle = document.querySelector('[data-dsh-share-hide-process]') as HTMLInputElement
+    expect(toggle.checked).toBe(false)
+    toggle.click()
+
+    await vi.waitFor(() => expect(renderImage).toHaveBeenCalledTimes(2))
+    expect(renderedContent[1]).toContain('问题 clean')
+    expect(renderedContent[1]).toContain('最终回答 clean')
+    expect(renderedContent[1]).not.toContain('Think')
+    expect(renderedContent[1]).not.toContain('Bash')
+    expect(renderedContent[1]).not.toContain('中间说明')
+    expect(window.localStorage.getItem('dsh-share.hide-process')).toBe('true')
 
     dispose()
   })

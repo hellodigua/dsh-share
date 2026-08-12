@@ -102,6 +102,24 @@ const STYLE_TEXT = `
   font-size: 13px;
   white-space: nowrap;
 }
+.dsh-share-dialog__toggle {
+  align-items: center;
+  color: var(--dsw-alias-label-secondary, #6b7280);
+  cursor: pointer;
+  display: inline-flex;
+  font-size: 13px;
+  gap: 7px;
+  margin-left: auto;
+  user-select: none;
+  white-space: nowrap;
+}
+.dsh-share-dialog__toggle input {
+  accent-color: #4d6bfe;
+  cursor: pointer;
+  height: 15px;
+  margin: 0;
+  width: 15px;
+}
 .dsh-share-dialog__segmented {
   border: 1px solid var(--dsw-alias-line-border, rgba(127, 127, 127, .24));
   border-radius: 8px;
@@ -247,6 +265,7 @@ interface Translation {
   close: string
   width: string
   fontSize: string
+  hideProcess: string
   phone: string
   tablet: string
   desktop: string
@@ -276,6 +295,7 @@ function t(document: Document): Translation {
       close: '关闭',
       width: '宽度',
       fontSize: '字号',
+      hideProcess: '不展示过程',
       phone: '手机',
       tablet: '平板',
       desktop: '电脑',
@@ -299,6 +319,7 @@ function t(document: Document): Translation {
     close: 'Close',
     width: 'Width',
     fontSize: 'Size',
+    hideProcess: 'Hide process',
     phone: 'Phone',
     tablet: 'Tablet',
     desktop: 'Desktop',
@@ -336,6 +357,7 @@ class PreviewDialog {
   private readonly status: HTMLElement
   private readonly copyButton: HTMLButtonElement
   private readonly downloadButton: HTMLButtonElement
+  private readonly hideProcessInput: HTMLInputElement
   private readonly choiceButtons: HTMLButtonElement[]
   private readonly storage?: Storage
   private currentSettings: ShareSettings
@@ -372,6 +394,10 @@ class PreviewDialog {
           <span class="dsh-share-dialog__field-label" data-dsh-share-font-size-label></span>
           <div class="dsh-share-dialog__segmented" data-dsh-share-font-size role="group"></div>
         </div>
+        <label class="dsh-share-dialog__toggle">
+          <input data-dsh-share-hide-process type="checkbox" />
+          <span data-dsh-share-hide-process-label></span>
+        </label>
       </div>
       <div class="dsh-share-dialog__body">
         <p class="dsh-share-dialog__message" data-dsh-share-message role="status"></p>
@@ -389,6 +415,7 @@ class PreviewDialog {
     this.status = dialog.querySelector('[data-dsh-share-status]') as HTMLElement
     this.copyButton = dialog.querySelector('[data-dsh-share-copy]') as HTMLButtonElement
     this.downloadButton = dialog.querySelector('[data-dsh-share-download]') as HTMLButtonElement
+    this.hideProcessInput = dialog.querySelector('[data-dsh-share-hide-process]') as HTMLInputElement
 
     const widthGroup = dialog.querySelector('[data-dsh-share-width]') as HTMLElement
     const fontSizeGroup = dialog.querySelector('[data-dsh-share-font-size]') as HTMLElement
@@ -414,9 +441,11 @@ class PreviewDialog {
     const close = dialog.querySelector('[data-dsh-share-close]') as HTMLButtonElement
     const widthLabel = dialog.querySelector('[data-dsh-share-width-label]') as HTMLElement
     const fontSizeLabel = dialog.querySelector('[data-dsh-share-font-size-label]') as HTMLElement
+    const hideProcessLabel = dialog.querySelector('[data-dsh-share-hide-process-label]') as HTMLElement
     title.textContent = strings.title
     widthLabel.textContent = strings.width
     fontSizeLabel.textContent = strings.fontSize
+    hideProcessLabel.textContent = strings.hideProcess
     widthGroup.ariaLabel = strings.width
     fontSizeGroup.ariaLabel = strings.fontSize
     close.textContent = '×'
@@ -435,7 +464,14 @@ class PreviewDialog {
     })
     this.copyButton.addEventListener('click', () => void this.copy())
     this.downloadButton.addEventListener('click', () => this.download())
-    this.updateChoiceState()
+    this.hideProcessInput.addEventListener('change', () => {
+      const next = { ...this.currentSettings, hideProcess: this.hideProcessInput.checked }
+      this.currentSettings = next
+      saveShareSettings(this.storage, next)
+      this.updateControlState()
+      this.options.onSettingsChange(this.settings)
+    })
+    this.updateControlState()
     document.body.append(dialog)
   }
 
@@ -576,19 +612,20 @@ class PreviewDialog {
       if (next.width === this.currentSettings.width && next.fontSize === this.currentSettings.fontSize) return
       this.currentSettings = next
       saveShareSettings(this.storage, next)
-      this.updateChoiceState()
+      this.updateControlState()
       this.options.onSettingsChange(this.settings)
     })
     return button
   }
 
-  private updateChoiceState(): void {
+  private updateControlState(): void {
     for (const button of this.choiceButtons) {
       const selected = button.dataset.dshShareChoice === 'width'
         ? button.dataset.value === this.currentSettings.width
         : button.dataset.value === this.currentSettings.fontSize
       button.setAttribute('aria-pressed', String(selected))
     }
+    this.hideProcessInput.checked = this.currentSettings.hideProcess
   }
 
   private clearResult(): void {
