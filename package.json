@@ -27,6 +27,7 @@
     "cordis.patch.yml",
     "LICENSE",
     "README.md",
+    "README.en.md",
     "THIRD_PARTY_LICENSES.md"
   ],
   "exports": {

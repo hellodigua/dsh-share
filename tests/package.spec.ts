@@ -17,6 +17,8 @@ describe('DSH 插件清单', () => {
     expect(packageJson.exports).toHaveProperty('./client')
     expect(packageJson.files).toContain('cordis.patch.yml')
     expect(packageJson.files).toContain('THIRD_PARTY_LICENSES.md')
+    expect(packageJson.files).toContain('README.md')
+    expect(packageJson.files).toContain('README.en.md')
     expect(packageJson.repository.url).toBe('git+https://github.com/hellodigua/dsh-share.git')
     expect(packageJson.scripts.verify).toContain('pnpm typecheck')
     expect(packageJson.license).toBe('MIT')
@@ -47,10 +49,15 @@ describe('DSH 插件清单', () => {
     expect(config).toContain("neverBundle: ['react', '@deepseek-ai/dsh-client-ui-primitives']")
   })
 
-  it('README 说明正式插槽和剩余的 DOM 兼容边界', async () => {
-    const readme = await readFile(new URL('../README.md', import.meta.url), 'utf8')
-    expect(readme).toContain('conversation.chat.assistant-actions')
-    expect(readme).toContain('不再扫描或修改按钮栏 DOM')
-    expect(readme).not.toContain('暂时没有为消息操作区提供正式插件插槽')
+  it('默认中文 README 和英文 README 说明正式插槽及 DOM 兼容边界', async () => {
+    const chineseReadme = await readFile(new URL('../README.md', import.meta.url), 'utf8')
+    const englishReadme = await readFile(new URL('../README.en.md', import.meta.url), 'utf8')
+
+    expect(chineseReadme).toContain('[English](./README.en.md)')
+    expect(chineseReadme).toContain('conversation.chat.assistant-actions')
+    expect(chineseReadme).toContain('不再扫描或修改按钮栏 DOM')
+    expect(englishReadme).toContain('[简体中文](./README.md)')
+    expect(englishReadme).toContain('conversation.chat.assistant-actions')
+    expect(englishReadme).toContain('no longer scans or modifies the action bar DOM')
   })
 })
