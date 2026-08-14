@@ -60,9 +60,9 @@ describe('DSH 插件清单', () => {
 
     expect(chineseReadme).toContain('[English](./README.en.md)')
     expect(chineseReadme).toContain('conversation.chat.assistant-actions')
-    expect(chineseReadme).toContain('不再扫描或修改按钮栏 DOM')
+    expect(chineseReadme).toContain('不扫描或修改按钮栏 DOM')
     expect(englishReadme).toContain('[简体中文](./README.md)')
     expect(englishReadme).toContain('conversation.chat.assistant-actions')
-    expect(englishReadme).toContain('no longer scans or modifies the action bar DOM')
+    expect(englishReadme).toContain('does not scan or modify the action bar DOM')
   })
 })

@@ -43,7 +43,7 @@ const STYLE_TEXT = `
 }
 /* 官方 slot 固定在分支按钮前；只调整 flex 视觉顺序，不移动 React 管理的 DOM。 */
 [data-dsh-share-button] { order: 1; }
-[data-dsh-share-button] ~ span { order: 2; }
+[data-time-hover-root] > div:has([data-dsh-share-button]) > span:last-child { order: 2; }
 [data-dsh-share-button]:hover {
   background: var(--dsw-alias-interactive-bg-hover, rgba(127, 127, 127, .12));
   color: var(--dsw-alias-label-secondary, currentColor);

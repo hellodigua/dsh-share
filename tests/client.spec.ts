@@ -137,7 +137,9 @@ describe('分享按钮运行时', () => {
     expect(styleText).not.toContain('opacity: .72')
     expect(styleText).toContain('margin-left: auto')
     expect(styleText).toContain('[data-dsh-share-button] { order: 1; }')
-    expect(styleText).toContain('[data-dsh-share-button] ~ span { order: 2; }')
+    expect(styleText).toContain(
+      '[data-time-hover-root] > div:has([data-dsh-share-button]) > span:last-child { order: 2; }',
+    )
     expect(document.querySelector('.dsh-share-dialog__controls')?.lastElementChild?.classList
       .contains('dsh-share-dialog__toggle')).toBe(true)
 
@@ -170,14 +172,19 @@ describe('分享按钮运行时', () => {
 
   it('把分享按钮显示在分支右侧，并保持时间信息在最后', () => {
     const runtime = createShareRuntime(document)
+    const turnTail = document.createElement('div')
+    turnTail.dataset.timeHoverRoot = ''
     const row = document.createElement('div')
     row.style.display = 'flex'
     row.innerHTML = `
       <button data-copy></button>
-      <button data-dsh-share-button></button>
+      <div data-slot="conversation.chat.assistant-actions" style="display: contents">
+        <button data-dsh-share-button></button>
+      </div>
       <button data-branch></button>
       <span data-clock></span>`
-    document.body.append(row)
+    turnTail.append(row)
+    document.body.append(turnTail)
 
     expect(getComputedStyle(row.querySelector('[data-branch]') as HTMLElement).order).toBe('')
     expect(getComputedStyle(row.querySelector('[data-dsh-share-button]') as HTMLElement).order).toBe('1')

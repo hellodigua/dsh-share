@@ -2,7 +2,7 @@
 
 简体中文 | [English](./README.en.md)
 
-把 DSH 中的一轮问答生成 PNG 图片，可直接复制到剪贴板或下载，不修改 DSH 核心代码。
+把 DSH 中的一轮问答生成 PNG 图片，可直接复制到剪贴板或下载。
 
 ![dsh-share 分享图片预览](./assets/readme/share-dialog.webp)
 

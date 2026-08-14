@@ -2,7 +2,7 @@
 
 [简体中文](./README.md) | English
 
-Turn a question-and-answer exchange in DSH into a PNG image. Copy it to the clipboard or download it without modifying DSH core.
+Turn a question-and-answer exchange in DSH into a PNG image. Copy it to the clipboard or download it.
 
 ![dsh-share dialog preview](./assets/readme/share-dialog.webp)
 
