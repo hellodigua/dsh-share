@@ -115,3 +115,7 @@ corepack pnpm verify
 ## License
 
 项目使用 [MIT](LICENSE) 许可证。浏览器 bundle 内联依赖的许可证见 [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md)。
+
+## 友情链接
+
+已加入 [dshfind.com](https://dshfind.com) DSH 插件超市。
