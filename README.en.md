@@ -115,3 +115,7 @@ Run `corepack pnpm release:check` before a release. See [RELEASING.md](https://g
 ## License
 
 Licensed under the [MIT License](LICENSE). Licenses for dependencies bundled into the browser build are listed in [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md).
+
+## Links
+
+Available on the [dshfind.com](https://dshfind.com) DSH plugin marketplace.
