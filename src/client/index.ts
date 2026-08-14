@@ -219,6 +219,7 @@ const STYLE_TEXT = `
   line-height: 22px;
 }
 [data-dsh-share-selection-cancel],
+[data-dsh-share-selection-markdown],
 [data-dsh-share-selection-create] {
   appearance: none;
   border-radius: 999px;
@@ -230,10 +231,13 @@ const STYLE_TEXT = `
   padding: 6px 18px;
   white-space: nowrap;
 }
-[data-dsh-share-selection-cancel] {
+[data-dsh-share-selection-cancel],
+[data-dsh-share-selection-markdown] {
   background: transparent;
   border: 1px solid var(--dsw-alias-border-l1, rgba(127, 127, 127, .4));
   color: var(--dsw-alias-label-primary, currentColor);
+}
+[data-dsh-share-selection-cancel] {
   min-width: 72px;
 }
 [data-dsh-share-selection-create] {
@@ -242,17 +246,19 @@ const STYLE_TEXT = `
   border: 1px solid var(--dsw-static-deepseek-500, #4d6bfe);
   color: #fff;
   display: inline-flex;
-  gap: 6px;
   justify-content: center;
   min-width: 132px;
 }
-[data-dsh-share-selection-cancel]:hover { background: var(--dsw-alias-interactive-bg-hover, rgba(127, 127, 127, .12)); }
+[data-dsh-share-selection-cancel]:hover,
+[data-dsh-share-selection-markdown]:hover:not(:disabled) { background: var(--dsw-alias-interactive-bg-hover, rgba(127, 127, 127, .12)); }
 [data-dsh-share-selection-create]:hover:not(:disabled) { background: #405bea; border-color: #405bea; }
+[data-dsh-share-selection-markdown]:disabled,
 [data-dsh-share-selection-create]:disabled { cursor: not-allowed; opacity: .45; }
 @media (max-width: 720px) {
   [data-dsh-share-selection-footer-inner] { width: calc(100% - 32px); }
   [data-dsh-share-selection-count] { font-size: 13px; }
   [data-dsh-share-selection-cancel],
+  [data-dsh-share-selection-markdown],
   [data-dsh-share-selection-create] { min-width: 0; padding-inline: 13px; }
 }
 [data-dsh-share-dialog] {
@@ -500,7 +506,7 @@ function t(document: Document): Translation {
       title: '分享当前问答',
       selectedTitle: count => `分享所选对话（${count} 组）`,
       share: '将当前问答分享为图片',
-      shareTooltip: '分享为图片',
+      shareTooltip: '分享',
       shareConversation: '分享对话',
       cancelSelection: '取消',
       createSelection: '生成分享图片',
@@ -534,7 +540,7 @@ function t(document: Document): Translation {
     title: 'Share this Q&A',
     selectedTitle: count => `Share selected conversation (${count} ${count === 1 ? 'group' : 'groups'})`,
     share: 'Share this Q&A as an image',
-    shareTooltip: 'Share as image',
+    shareTooltip: 'Share',
     shareConversation: 'Share conversation',
     cancelSelection: 'Cancel',
     createSelection: 'Create image',
@@ -581,6 +587,16 @@ function createFilename(extension: 'png' | 'md', now = new Date()): string {
   return `dsh-share-${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}.${extension}`
 }
 
+function downloadMarkdownFile(document: Document, markdown: string): void {
+  if (!markdown) return
+  const objectUrl = URL.createObjectURL(new Blob([markdown], { type: 'text/markdown;charset=utf-8' }))
+  const anchor = document.createElement('a')
+  anchor.href = objectUrl
+  anchor.download = createFilename('md')
+  anchor.click()
+  document.defaultView?.setTimeout(() => URL.revokeObjectURL(objectUrl), 0)
+}
+
 interface PreviewDialogOptions {
   onSettingsChange(settings: ShareSettings): void
   onDismiss(): void
@@ -594,13 +610,11 @@ class PreviewDialog {
   private readonly status: HTMLElement
   private readonly copyButton: HTMLButtonElement
   private readonly downloadButton: HTMLButtonElement
-  private readonly markdownButton: HTMLButtonElement
   private readonly hideProcessInput: HTMLInputElement
   private readonly choiceButtons: HTMLButtonElement[]
   private readonly storage?: Storage
   private currentSettings: ShareSettings
   private blob?: Blob
-  private markdown?: string
   private objectUrl?: string
 
   constructor(
@@ -644,7 +658,6 @@ class PreviewDialog {
       </div>
       <div class="dsh-share-dialog__footer">
         <span class="dsh-share-dialog__status" data-dsh-share-status role="status"></span>
-        <button class="dsh-share-dialog__action" data-dsh-share-download-markdown type="button"></button>
         <button class="dsh-share-dialog__action" data-dsh-share-download type="button"></button>
         <button class="dsh-share-dialog__action dsh-share-dialog__action--primary" data-dsh-share-copy type="button"></button>
       </div>`
@@ -656,7 +669,6 @@ class PreviewDialog {
     this.status = dialog.querySelector('[data-dsh-share-status]') as HTMLElement
     this.copyButton = dialog.querySelector('[data-dsh-share-copy]') as HTMLButtonElement
     this.downloadButton = dialog.querySelector('[data-dsh-share-download]') as HTMLButtonElement
-    this.markdownButton = dialog.querySelector('[data-dsh-share-download-markdown]') as HTMLButtonElement
     this.hideProcessInput = dialog.querySelector('[data-dsh-share-hide-process]') as HTMLInputElement
 
     const widthGroup = dialog.querySelector('[data-dsh-share-width]') as HTMLElement
@@ -694,8 +706,6 @@ class PreviewDialog {
     close.ariaLabel = strings.close
     this.copyButton.textContent = strings.copy
     this.downloadButton.textContent = strings.download
-    this.markdownButton.textContent = strings.downloadMarkdown
-    this.markdownButton.disabled = true
 
     close.addEventListener('click', () => this.close())
     dialog.addEventListener('click', (event) => {
@@ -707,7 +717,6 @@ class PreviewDialog {
     })
     this.copyButton.addEventListener('click', () => void this.copy())
     this.downloadButton.addEventListener('click', () => this.download())
-    this.markdownButton.addEventListener('click', () => this.downloadMarkdown())
     this.hideProcessInput.addEventListener('change', () => {
       const next = { ...this.currentSettings, hideProcess: this.hideProcessInput.checked }
       this.currentSettings = next
@@ -724,7 +733,6 @@ class PreviewDialog {
   }
 
   showLoading(
-    markdown: string,
     turnCount: number,
     preservePreview = false,
     selectionExport = false,
@@ -732,8 +740,6 @@ class PreviewDialog {
     const strings = t(this.document)
     const canPreserve = preservePreview && this.blob !== undefined && this.objectUrl !== undefined
     this.title.textContent = selectionExport ? strings.selectedTitle(turnCount) : strings.title
-    this.markdown = markdown || undefined
-    this.markdownButton.disabled = !markdown
     this.element.ariaBusy = 'true'
     this.copyButton.disabled = true
     this.downloadButton.disabled = true
@@ -754,14 +760,13 @@ class PreviewDialog {
     this.open()
   }
 
-  /** 设置连续变化时先保留当前预览，只更新轻量状态；Markdown 与图片稍后统一重算。 */
+  /** 设置连续变化时先保留当前预览，只更新轻量状态；图片稍后统一重算。 */
   showPendingUpdate(): void {
     const strings = t(this.document)
     const canPreserve = this.blob !== undefined && this.objectUrl !== undefined
     this.element.ariaBusy = 'true'
     this.copyButton.disabled = true
     this.downloadButton.disabled = true
-    this.markdownButton.disabled = true
     if (canPreserve) {
       this.message.hidden = true
       this.image.hidden = false
@@ -903,8 +908,6 @@ class PreviewDialog {
 
   private clearResult(): void {
     this.clearImageResult()
-    this.markdown = undefined
-    this.markdownButton.disabled = true
   }
 
   private clearImageResult(): void {
@@ -943,15 +946,6 @@ class PreviewDialog {
     anchor.click()
   }
 
-  private downloadMarkdown(): void {
-    if (!this.markdown) return
-    const objectUrl = URL.createObjectURL(new Blob([this.markdown], { type: 'text/markdown;charset=utf-8' }))
-    const anchor = this.document.createElement('a')
-    anchor.href = objectUrl
-    anchor.download = createFilename('md')
-    anchor.click()
-    this.document.defaultView?.setTimeout(() => URL.revokeObjectURL(objectUrl), 0)
-  }
 }
 
 export interface ShareSelectionSnapshot {
@@ -1036,24 +1030,6 @@ function makeButton(document: Document, dataName: string): HTMLButtonElement {
   return button
 }
 
-function makeLinkIcon(document: Document): SVGSVGElement {
-  const namespace = 'http://www.w3.org/2000/svg'
-  const svg = document.createElementNS(namespace, 'svg')
-  svg.setAttribute('aria-hidden', 'true')
-  svg.setAttribute('fill', 'none')
-  svg.setAttribute('height', '16')
-  svg.setAttribute('viewBox', '0 0 16 16')
-  svg.setAttribute('width', '16')
-  const path = document.createElementNS(namespace, 'path')
-  path.setAttribute('d', 'M6.2 9.8 9.8 6.2M5.1 11.9l-1 .9a2.8 2.8 0 0 1-4-4l2.1-2.1a2.8 2.8 0 0 1 4 0M10.9 4.1l1-.9a2.8 2.8 0 1 1 4 4l-2.1 2.1a2.8 2.8 0 0 1-4 0')
-  path.setAttribute('stroke', 'currentColor')
-  path.setAttribute('stroke-linecap', 'round')
-  path.setAttribute('stroke-linejoin', 'round')
-  path.setAttribute('stroke-width', '1.4')
-  svg.append(path)
-  return svg
-}
-
 export function createShareRuntime(document: Document, options: InstallOptions = {}): ShareRuntime {
   const style = document.createElement('style')
   style.id = STYLE_ID
@@ -1135,11 +1111,13 @@ export function createShareRuntime(document: Document, options: InstallOptions =
       const strings = t(document)
       const all = controller.footer.querySelector<HTMLButtonElement>('[data-dsh-share-select-all]')
       const count = controller.footer.querySelector<HTMLElement>('[data-dsh-share-selection-count]')
+      const markdown = controller.footer.querySelector<HTMLButtonElement>('[data-dsh-share-selection-markdown]')
       const create = controller.footer.querySelector<HTMLButtonElement>('[data-dsh-share-selection-create]')
       all?.setAttribute('aria-checked', String(controller.snapshot.allSelected))
       const nextCount = strings.selectedCount(controller.selected.size)
       // footer 位于被观察的会话区域内；仅在文案变化时写入，避免自身触发 MutationObserver 循环。
       if (count && count.textContent !== nextCount) count.textContent = nextCount
+      if (markdown) markdown.disabled = controller.selected.size === 0
       if (create) create.disabled = controller.selected.size === 0
     }
     for (const listener of controller.listeners) listener()
@@ -1368,8 +1346,16 @@ export function createShareRuntime(document: Document, options: InstallOptions =
     cancel.textContent = strings.cancelSelection
     cancel.addEventListener('click', () => resetSelection(controller))
 
+    const markdown = makeButton(document, 'dshShareSelectionMarkdown')
+    markdown.textContent = strings.downloadMarkdown
+    markdown.addEventListener('click', () => {
+      const messages = selectedTurnsToShareMessages(controller.selected.values())
+      if (messages.length === 0) return
+      downloadMarkdownFile(document, createShareMarkdown(messages, getLocale(document), dialog.settings))
+    })
+
     const create = makeButton(document, 'dshShareSelectionCreate')
-    create.append(makeLinkIcon(document), document.createTextNode(strings.createSelection))
+    create.textContent = strings.createSelection
     create.addEventListener('click', () => {
       const messages = selectedTurnsToShareMessages(controller.selected.values())
       if (messages.length === 0) return
@@ -1378,7 +1364,7 @@ export function createShareRuntime(document: Document, options: InstallOptions =
       void renderContent(messages, activeGroupCount)
     })
 
-    inner.append(selectAll, divider, count, cancel, create)
+    inner.append(selectAll, divider, count, cancel, markdown, create)
     footer.append(inner)
     return footer
   }
@@ -1397,8 +1383,7 @@ export function createShareRuntime(document: Document, options: InstallOptions =
   ): RenderRequest => {
     const locale = getLocale(document)
     const settings = dialog.settings
-    const markdown = createShareMarkdown(content, locale, settings)
-    dialog.showLoading(markdown, groupCount, preservePreview, true)
+    dialog.showLoading(groupCount, preservePreview, true)
     return { content, epoch, locale, preservePreview, settings }
   }
 

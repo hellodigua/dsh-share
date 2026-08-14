@@ -199,7 +199,7 @@ describe('分享按钮运行时', () => {
 
     const action = actionComponent(actionProps(runtime, 'message-one'))
     expect(action.type).toBe(Tooltip)
-    expect(action.props).toMatchObject({ label: '分享为图片', side: 'bottom' })
+    expect(action.props).toMatchObject({ label: '分享', side: 'bottom' })
     expect(action.props.children.type).toBe('button')
     expect(action.props.children.props).toMatchObject({
       'data-dsh-share-button': '',
@@ -237,7 +237,7 @@ describe('分享按钮运行时', () => {
     const action = ShareAction(actionProps(runtime, 'message-en'))
     const header = ShareConversationAction(headerProps(runtime))
 
-    expect(action.props.label).toBe('Share as image')
+    expect(action.props.label).toBe('Share')
     expect(action.props.children.props['aria-label']).toBe('Share this Q&A as an image')
     expect(header.props.label).toBe('Share conversation')
 
@@ -323,6 +323,12 @@ describe('分享按钮运行时', () => {
     expect(footer.textContent).toContain('全选')
     expect(footer.textContent).toContain('已选择 2 组对话')
     expect(getComputedStyle(footer).height).toBe('66px')
+    const markdown = footer.querySelector<HTMLButtonElement>('[data-dsh-share-selection-markdown]')
+    const create = footer.querySelector<HTMLButtonElement>('[data-dsh-share-selection-create]')
+    expect(markdown?.textContent).toBe('下载 Markdown')
+    expect(markdown?.nextElementSibling).toBe(create)
+    expect(create?.textContent).toBe('生成分享图片')
+    expect(create?.querySelector('svg')).toBeNull()
     expect(ShareAction(actionProps(runtime)).type).toBe(Fragment)
     expect(ShareConversationAction(headerProps(runtime)).type).toBe(Fragment)
 
@@ -402,6 +408,7 @@ describe('分享按钮运行时', () => {
     )
     const first = firstPair[1]
     const selectAll = fixture.scroll.querySelector<HTMLButtonElement>('[data-dsh-share-select-all]')
+    const markdown = fixture.scroll.querySelector<HTMLButtonElement>('[data-dsh-share-selection-markdown]')
     const create = fixture.scroll.querySelector<HTMLButtonElement>('[data-dsh-share-selection-create]')
     first?.click()
     expect(runtime.selectionFor('session-1').getSnapshot()).toMatchObject({
@@ -422,6 +429,7 @@ describe('分享按钮运行时', () => {
       allSelected: false,
       count: 0,
     })
+    expect(markdown?.disabled).toBe(true)
     expect(create?.disabled).toBe(true)
     expect(getComputedStyle(create as HTMLElement).opacity).toBe('0.45')
 
@@ -457,6 +465,15 @@ describe('分享按钮运行时', () => {
     ;(fixture.scroll.querySelector('[data-dsh-share-select-all]') as HTMLButtonElement).click()
     ;(fixture.scroll.querySelector('[data-turn-id="1"]') as HTMLButtonElement).click()
     ;(fixture.scroll.querySelector('[data-turn-id="3"]') as HTMLButtonElement).click()
+
+    const markdownButton = fixture.scroll.querySelector(
+      '[data-dsh-share-selection-markdown]',
+    ) as HTMLButtonElement
+    expect(markdownButton.disabled).toBe(false)
+    markdownButton.click()
+    expect(createdBlobs.some(blob => blob.type.startsWith('text/markdown'))).toBe(true)
+    expect(downloadedFilename).toMatch(/^dsh-share-\d{8}-\d{6}\.md$/)
+
     ;(fixture.scroll.querySelector('[data-dsh-share-selection-create]') as HTMLButtonElement).click()
 
     await vi.waitFor(() => expect(renderImage).toHaveBeenCalledOnce())
@@ -470,12 +487,11 @@ describe('分享按钮运行时', () => {
     expect(rendered[0]?.querySelectorAll('[data-dsh-share-message-group]')).toHaveLength(4)
     expect(rendered[0]?.querySelector('[data-dsh-share-omission]')).not.toBeNull()
     expect(document.querySelector('[data-dsh-share-title]')?.textContent).toBe('分享所选对话（2 组）')
-
-    const markdownButton = document.querySelector('[data-dsh-share-download-markdown]') as HTMLButtonElement
-    expect(markdownButton.disabled).toBe(false)
-    markdownButton.click()
-    expect(createdBlobs.some(blob => blob.type.startsWith('text/markdown'))).toBe(true)
-    expect(downloadedFilename).toMatch(/^dsh-share-\d{8}-\d{6}\.md$/)
+    const dialogFooter = document.querySelector('.dsh-share-dialog__footer') as HTMLElement
+    expect(dialogFooter.querySelector('[data-dsh-share-download-markdown]')).toBeNull()
+    expect(dialogFooter.querySelectorAll('button')).toHaveLength(2)
+    expect(dialogFooter.querySelector('[data-dsh-share-download]')).not.toBeNull()
+    expect(dialogFooter.querySelector('[data-dsh-share-copy]')).not.toBeNull()
 
     runtime.dispose()
   })
