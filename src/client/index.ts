@@ -254,12 +254,49 @@ const STYLE_TEXT = `
 [data-dsh-share-selection-create]:hover:not(:disabled) { background: #405bea; border-color: #405bea; }
 [data-dsh-share-selection-markdown]:disabled,
 [data-dsh-share-selection-create]:disabled { cursor: not-allowed; opacity: .45; }
+[data-dsh-share-label="compact"] { display: none; }
 @media (max-width: 720px) {
-  [data-dsh-share-selection-footer-inner] { width: calc(100% - 32px); }
-  [data-dsh-share-selection-count] { font-size: 13px; }
+  [data-dsh-share-selection-footer] {
+    height: 108px;
+    margin-top: -108px;
+    padding: 10px 0;
+  }
+  [data-dsh-share-selection-footer-inner] {
+    display: grid;
+    gap: 8px;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-rows: repeat(2, 36px);
+    width: calc(100% - 32px);
+  }
+  [data-dsh-share-select-all] {
+    grid-column: 1;
+    grid-row: 1;
+    justify-self: start;
+  }
+  [data-dsh-share-selection-divider] { display: none; }
+  [data-dsh-share-selection-count] {
+    font-size: 13px;
+    grid-column: 2 / 4;
+    grid-row: 1;
+    overflow: hidden;
+    text-align: right;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
   [data-dsh-share-selection-cancel],
   [data-dsh-share-selection-markdown],
-  [data-dsh-share-selection-create] { min-width: 0; padding-inline: 13px; }
+  [data-dsh-share-selection-create] {
+    font-size: 13px;
+    grid-row: 2;
+    min-width: 0;
+    padding-inline: 6px;
+    width: 100%;
+  }
+  [data-dsh-share-selection-cancel] { grid-column: 1; }
+  [data-dsh-share-selection-markdown] { grid-column: 2; }
+  [data-dsh-share-selection-create] { grid-column: 3; }
+  [data-dsh-share-label="wide"] { display: none; }
+  [data-dsh-share-label="compact"] { display: inline; }
 }
 [data-dsh-share-dialog] {
   background: var(--dsw-alias-bg-base, #fff);
@@ -470,6 +507,7 @@ interface Translation {
   shareConversation: string
   cancelSelection: string
   createSelection: string
+  createSelectionCompact: string
   selectAll: string
   selectedCount(count: number): string
   selectTurn: string
@@ -478,6 +516,7 @@ interface Translation {
   copy: string
   download: string
   downloadMarkdown: string
+  downloadMarkdownCompact: string
   copied: string
   copyUnsupported: string
   copyFailed: string
@@ -504,20 +543,22 @@ function t(document: Document): Translation {
   if (getLocale(document) === 'zh') {
     return {
       title: '分享当前问答',
-      selectedTitle: count => `分享所选对话（${count} 组）`,
+      selectedTitle: () => '生成图片',
       share: '将当前问答分享为图片',
       shareTooltip: '分享',
       shareConversation: '分享对话',
       cancelSelection: '取消',
       createSelection: '生成分享图片',
+      createSelectionCompact: '生成图片',
       selectAll: '全选',
       selectedCount: count => `已选择 ${count} 组对话`,
       selectTurn: '选择这组对话',
       unselectTurn: '取消选择这组对话',
       loading: '正在生成图片…',
       copy: '复制图片',
-      download: '下载 PNG',
+      download: '下载图片',
       downloadMarkdown: '下载 Markdown',
+      downloadMarkdownCompact: '下载MD',
       copied: '图片已复制',
       copyUnsupported: '当前浏览器不支持复制图片，请下载 PNG。',
       copyFailed: '复制失败，请下载 PNG。',
@@ -538,20 +579,22 @@ function t(document: Document): Translation {
   }
   return {
     title: 'Share this Q&A',
-    selectedTitle: count => `Share selected conversation (${count} ${count === 1 ? 'group' : 'groups'})`,
+    selectedTitle: () => 'Generate image',
     share: 'Share this Q&A as an image',
     shareTooltip: 'Share',
     shareConversation: 'Share conversation',
     cancelSelection: 'Cancel',
     createSelection: 'Create image',
+    createSelectionCompact: 'Create image',
     selectAll: 'Select all',
     selectedCount: count => `${count} conversation ${count === 1 ? 'group' : 'groups'} selected`,
     selectTurn: 'Select this conversation group',
     unselectTurn: 'Unselect this conversation group',
     loading: 'Generating image…',
     copy: 'Copy image',
-    download: 'Download PNG',
+    download: 'Download image',
     downloadMarkdown: 'Download Markdown',
+    downloadMarkdownCompact: 'Markdown',
     copied: 'Image copied',
     copyUnsupported: 'Image clipboard is unavailable. Please download the PNG.',
     copyFailed: 'Could not copy the image. Please download the PNG.',
@@ -1030,6 +1073,22 @@ function makeButton(document: Document, dataName: string): HTMLButtonElement {
   return button
 }
 
+function appendResponsiveLabel(
+  document: Document,
+  button: HTMLButtonElement,
+  wide: string,
+  compact: string,
+): void {
+  const wideLabel = document.createElement('span')
+  wideLabel.dataset.dshShareLabel = 'wide'
+  wideLabel.textContent = wide
+  const compactLabel = document.createElement('span')
+  compactLabel.dataset.dshShareLabel = 'compact'
+  compactLabel.textContent = compact
+  button.ariaLabel = wide
+  button.append(wideLabel, compactLabel)
+}
+
 export function createShareRuntime(document: Document, options: InstallOptions = {}): ShareRuntime {
   const style = document.createElement('style')
   style.id = STYLE_ID
@@ -1347,7 +1406,12 @@ export function createShareRuntime(document: Document, options: InstallOptions =
     cancel.addEventListener('click', () => resetSelection(controller))
 
     const markdown = makeButton(document, 'dshShareSelectionMarkdown')
-    markdown.textContent = strings.downloadMarkdown
+    appendResponsiveLabel(
+      document,
+      markdown,
+      strings.downloadMarkdown,
+      strings.downloadMarkdownCompact,
+    )
     markdown.addEventListener('click', () => {
       const messages = selectedTurnsToShareMessages(controller.selected.values())
       if (messages.length === 0) return
@@ -1355,7 +1419,12 @@ export function createShareRuntime(document: Document, options: InstallOptions =
     })
 
     const create = makeButton(document, 'dshShareSelectionCreate')
-    create.textContent = strings.createSelection
+    appendResponsiveLabel(
+      document,
+      create,
+      strings.createSelection,
+      strings.createSelectionCompact,
+    )
     create.addEventListener('click', () => {
       const messages = selectedTurnsToShareMessages(controller.selected.values())
       if (messages.length === 0) return
