@@ -445,6 +445,11 @@ const STYLE_TEXT = `
   font-size: var(--dsh-share-font-size) !important;
   line-height: 1.75 !important;
 }
+[data-dsh-share-card] [data-dsh-share-tool-summary],
+[data-dsh-share-card] [data-dsh-share-tool-summary] :where(div, span) {
+  font-size: 14px !important;
+  line-height: 24px !important;
+}
 [data-dsh-share-card] [data-dsh-share-message] :where(h1) {
   font-size: calc(var(--dsh-share-font-size) * 1.55) !important;
   line-height: 1.3 !important;

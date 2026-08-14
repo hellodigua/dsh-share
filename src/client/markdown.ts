@@ -15,8 +15,15 @@ function createConverter(): TurndownService {
   converter.use(gfm)
   converter.addRule('dsh-tool-summary', {
     filter: node => node.hasAttribute('data-dsh-share-tool-summary'),
-    replacement: content => {
-      const body = content.trim().replace(/^/gm, '> ')
+    replacement: (_content, node) => {
+      // 图片保留原生摘要行的 DOM；Markdown 单独为相邻字段补上可读分隔符。
+      const parts = [...node.children]
+        .map(child => child.textContent?.replace(/\s+/g, ' ').trim() ?? '')
+        .filter(Boolean)
+      const summary = parts.length > 0
+        ? parts.join(' · ')
+        : node.textContent?.replace(/\s+/g, ' ').trim() ?? ''
+      const body = summary.replace(/^/gm, '> ')
       return body ? `\n\n${body}\n\n` : ''
     },
   })
