@@ -1,4 +1,6 @@
 import { toBlob } from 'html-to-image'
+import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
+import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import { IconShareOutline16, Tooltip } from '@deepseek-ai/dsh-client-ui-primitives'
 import { createElement, type MouseEvent as ReactMouseEvent, type ReactElement } from 'react'
 import { createShareCard } from './card.ts'
@@ -18,21 +20,6 @@ import {
 
 export const name = '@dsh-external/dsh-share/client'
 export const inject = ['slots']
-
-interface ClientContext {
-  slots: {
-    inject(name: 'conversation.chat.assistant-actions', callback: () => void | (() => void)): void
-    register(
-      options: {
-        name: 'conversation.chat.assistant-actions'
-        id: string
-        order: number
-        inject: () => ShareRuntimeInjected
-      },
-      component: (props: ShareActionProps) => ReactElement,
-    ): () => void
-  }
-}
 
 const STYLE_ID = 'dsh-share-style'
 const TRANSPARENT_IMAGE_PLACEHOLDER =

@@ -11,6 +11,7 @@ describe('DSH 插件清单', () => {
       license: string
       dsh: { bundle: { patch: string }; client: { inject: string[]; platform: string } }
       peerDependencies: Record<string, string>
+      devDependencies: Record<string, string>
     }
 
     expect(packageJson.exports).toHaveProperty('.')
@@ -30,6 +31,10 @@ describe('DSH 插件清单', () => {
       '@deepseek-ai/dsh-client-ui-primitives',
     ])
     expect(packageJson.peerDependencies.react).toBe('^18.2.0')
+    for (const name of packageJson.dsh.client.inject) {
+      expect(packageJson.peerDependencies[name]).toBe('^0.1.0-rc.6')
+      expect(packageJson.devDependencies[name]).toBe('0.1.0-rc.6')
+    }
   })
 
   it('不依赖本机 DSH checkout 就能安装开发依赖', async () => {

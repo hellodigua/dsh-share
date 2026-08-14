@@ -74,9 +74,9 @@ The tarball includes the browser bundle, so installation does not need to run th
 
 ## Compatibility
 
-This version uses the official message action slot introduced in DSH commit `7b9644f2b664`.
+This version targets npm `@deepseek-ai/dsh@0.1.0-rc.6` and declares DSH peers as `^0.1.0-rc.6`. Local development pins the exact rc.6 type packages, while the Web Profile still provides the shared runtime at deployment.
 
-The share button is mounted through `conversation.chat.assistant-actions` and no longer scans or modifies the action bar DOM. Image generation still reads the rendered `data-*` nodes for the current turn, so changes to DSH's conversation content structure may require an update to this plugin.
+The share button is mounted through the official `conversation.chat.assistant-actions` slot and is checked against the official Client types. It does not scan or modify the action bar DOM. Image generation reads the rendered `data-*` nodes for the current turn, so changes to DSH's conversation content structure may require an update to this plugin.
 
 ## Development
 

@@ -1,17 +1,7 @@
+import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client';
 import { type ReactElement } from 'react';
 export declare const name = "@dsh-external/dsh-share/client";
 export declare const inject: string[];
-interface ClientContext {
-    slots: {
-        inject(name: 'conversation.chat.assistant-actions', callback: () => void | (() => void)): void;
-        register(options: {
-            name: 'conversation.chat.assistant-actions';
-            id: string;
-            order: number;
-            inject: () => ShareRuntimeInjected;
-        }, component: (props: ShareActionProps) => ReactElement): () => void;
-    };
-}
 export type ImageRenderer = (element: HTMLElement) => Promise<Blob>;
 export interface InstallOptions {
     renderImage?: ImageRenderer;

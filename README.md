@@ -73,9 +73,9 @@ tarball 已包含浏览器构建产物，安装时不需要执行第三方构建
 
 ## 兼容性
 
-当前版本适配 DSH commit `7b9644f2b664` 引入的正式消息操作插槽。
+当前版本面向 npm `@deepseek-ai/dsh@0.1.0-rc.6`，DSH peers 声明为 `^0.1.0-rc.6`。本地开发使用精确 rc.6 类型包，部署时仍由 Web Profile 提供共享运行时。
 
-分享按钮通过 `conversation.chat.assistant-actions` 插槽挂载，不再扫描或修改按钮栏 DOM。生成图片时仍会读取当前轮已经渲染的 `data-*` 节点，因此 DSH 调整对话内容结构后可能需要同步适配。
+分享按钮通过官方 `conversation.chat.assistant-actions` 插槽挂载，并直接使用官方 Client 类型，不扫描或修改按钮栏 DOM。生成图片时会读取当前轮已经渲染的 `data-*` 节点，因此 DSH 调整对话内容结构后可能需要同步适配。
 
 ## 开发
 
