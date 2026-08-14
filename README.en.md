@@ -19,19 +19,25 @@ Share DSH Q&As or selected conversation groups as PNG or Markdown.
 
 The default is Tablet width with Standard font size. Your preferences are saved in the browser.
 
-## Installation
+## Quick installation
 
-### From a GitHub tag
-
-Pinning a version is recommended so future repository updates do not change the installed code:
+Add the plugin to the Web Profile with the DSH CLI, then restart `dsh web`:
 
 ```sh
-dsh plugin --profile web add \
-  --ignore-scripts --config.auto-install-peers=false \
-  'github:hellodigua/dsh-share#v0.1.0'
+dsh plugin --profile web add dsh-share
 ```
 
-Restart `dsh web` after installation.
+Use `dsh-share@0.2.0` to pin this release. A plain `npm install dsh-share` only adds the package to the current Node.js project; it does not enable the DSH plugin.
+
+## Other installation methods
+
+### From GitHub
+
+```sh
+dsh plugin --profile web add github:hellodigua/dsh-share#v0.2.0
+```
+
+The repository includes the built `lib/` output, so installation does not require a local build.
 
 ### From a local checkout
 
@@ -39,9 +45,7 @@ Restart `dsh web` after installation.
 git clone https://github.com/hellodigua/dsh-share.git
 cd dsh-share
 
-dsh plugin --profile web add \
-  --ignore-scripts --config.auto-install-peers=false \
-  .
+dsh plugin --profile web add .
 ```
 
 After changing the source code, build it and force-refresh the local package in the profile:
@@ -49,9 +53,7 @@ After changing the source code, build it and force-refresh the local package in 
 ```sh
 corepack pnpm build
 
-dsh plugin --profile web add --force \
-  --ignore-scripts --config.auto-install-peers=false \
-  .
+dsh plugin --profile web add --force .
 ```
 
 ### From a `local-plugins` tarball
@@ -69,8 +71,7 @@ Then install the generated file:
 
 ```sh
 dsh plugin --profile web add \
-  --ignore-scripts --config.auto-install-peers=false \
-  /absolute/path/to/local-plugins/dsh-external-dsh-share-0.1.0.tgz
+  /absolute/path/to/local-plugins/dsh-share-0.2.0.tgz
 ```
 
 The tarball includes the browser bundle, so installation does not need to run third-party build scripts.
@@ -101,6 +102,8 @@ corepack pnpm verify
 ```
 
 DSH loads the files in `lib/` directly, so they must be committed with the source. After changing `src/`, rebuild and make sure `lib/` is up to date.
+
+Run `corepack pnpm release:check` before a release. See [RELEASING.md](https://github.com/hellodigua/dsh-share/blob/main/RELEASING.md) for the GitHub-to-npm automation contract.
 
 ## Known limitations
 

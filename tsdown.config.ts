@@ -1,6 +1,6 @@
 import { defineConfig } from 'tsdown'
 
-const PACKAGE_ID = '@dsh-external/dsh-share'
+const PACKAGE_ID = 'dsh-share'
 
 export default defineConfig([
   {
