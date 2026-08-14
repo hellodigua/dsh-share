@@ -368,6 +368,28 @@ describe('分享按钮运行时', () => {
     runtime.dispose()
   })
 
+  it('切换已有问答组时复用快照，不重新深拷贝全部消息 DOM', async () => {
+    const fixture = createConversation()
+    addTurn(fixture, 'first', 1)
+    addTurn(fixture, 'second', 2)
+    const cloneNode = vi.spyOn(window.Node.prototype, 'cloneNode')
+    const runtime = createShareRuntime(document)
+    clickHeaderShare(runtime, fixture.source)
+    await Promise.resolve()
+
+    const clonesAfterEntry = cloneNode.mock.calls.length
+    expect(clonesAfterEntry).toBeGreaterThan(0)
+
+    const first = fixture.scroll.querySelector<HTMLButtonElement>('[data-turn-id="1"]')
+    first?.click()
+    await new Promise(resolve => window.setTimeout(resolve, 0))
+    first?.click()
+    await new Promise(resolve => window.setTimeout(resolve, 0))
+
+    expect(cloneNode).toHaveBeenCalledTimes(clonesAfterEntry)
+    runtime.dispose()
+  })
+
   it('支持单组取消、全选与清空，并在零选择时禁用生成按钮', () => {
     const fixture = createConversation()
     addTurn(fixture, 'first', 1)
@@ -548,6 +570,30 @@ describe('分享按钮运行时', () => {
     expect(revokeObjectURL).toHaveBeenCalledWith('blob:dsh-share-preview')
   })
 
+  it('单轮入口只为已选问答建立快照，首次选择其他轮次后缓存复用', async () => {
+    const fixture = createConversation()
+    addTurn(fixture, 'first', 1)
+    const secondTail = addTurn(fixture, 'second', 2)
+    addTurn(fixture, 'third', 3)
+    const cloneNode = vi.spyOn(window.Node.prototype, 'cloneNode')
+    const runtime = createShareRuntime(document)
+    triggerShareAction(secondTail, runtime, 'message-2', 2)
+    await Promise.resolve()
+
+    expect(cloneNode).toHaveBeenCalledTimes(2)
+    const first = fixture.scroll.querySelector<HTMLButtonElement>('[data-turn-id="1"]')
+    first?.click()
+    await Promise.resolve()
+    expect(cloneNode).toHaveBeenCalledTimes(4)
+
+    first?.click()
+    first?.click()
+    await Promise.resolve()
+    expect(cloneNode).toHaveBeenCalledTimes(4)
+
+    runtime.dispose()
+  })
+
   it('切换电脑和大字号后重新生成图片并保存偏好', async () => {
     Object.defineProperty(URL, 'createObjectURL', {
       configurable: true,
@@ -614,6 +660,54 @@ describe('分享按钮运行时', () => {
     expect(renderedContent[1]).not.toContain('Bash')
     expect(renderedContent[1]).not.toContain('中间说明')
     expect(window.localStorage.getItem('dsh-share.hide-process')).toBe('true')
+
+    runtime.dispose()
+  })
+
+  it('连续修改图片设置时串行渲染，并只执行最后一组待处理设置', async () => {
+    Object.defineProperty(URL, 'createObjectURL', {
+      configurable: true,
+      value: vi.fn(() => 'blob:dsh-share-latest'),
+    })
+    Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: vi.fn() })
+
+    let finishFirst: (() => void) | undefined
+    let activeRenders = 0
+    let maxActiveRenders = 0
+    const renderedSettings: Array<{ width: string; fontSize: string }> = []
+    const renderImage = vi.fn(async (element: HTMLElement) => {
+      activeRenders += 1
+      maxActiveRenders = Math.max(maxActiveRenders, activeRenders)
+      renderedSettings.push({
+        width: element.style.width,
+        fontSize: element.style.getPropertyValue('--dsh-share-font-size'),
+      })
+      if (renderedSettings.length === 1) {
+        await new Promise<void>((resolve) => { finishFirst = resolve })
+      }
+      activeRenders -= 1
+      return new Blob(['png'], { type: 'image/png' })
+    })
+
+    const fixture = createConversation()
+    const tail = addTurn(fixture, 'serial', 1)
+    const runtime = createShareRuntime(document, { renderImage })
+    triggerShareAction(tail, runtime)
+    ;(fixture.scroll.querySelector('[data-dsh-share-selection-create]') as HTMLButtonElement).click()
+    await vi.waitFor(() => expect(renderImage).toHaveBeenCalledTimes(1))
+
+    ;(document.querySelector('[data-dsh-share-choice="width"][data-value="desktop"]') as HTMLButtonElement).click()
+    ;(document.querySelector('[data-dsh-share-choice="font-size"][data-value="xlarge"]') as HTMLButtonElement).click()
+    await new Promise(resolve => window.setTimeout(resolve, 120))
+    expect(renderImage).toHaveBeenCalledTimes(1)
+
+    finishFirst?.()
+    await vi.waitFor(() => expect(renderImage).toHaveBeenCalledTimes(2))
+    expect(renderedSettings).toEqual([
+      { width: '768px', fontSize: '16px' },
+      { width: '1024px', fontSize: '20px' },
+    ])
+    expect(maxActiveRenders).toBe(1)
 
     runtime.dispose()
   })

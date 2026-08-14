@@ -12,7 +12,8 @@ import {
 } from './content.ts'
 import {
   findRenderedTurns,
-  snapshotElements,
+  snapshotTurnContent,
+  type TurnContent,
 } from './dom.ts'
 import { createShareMarkdown } from './markdown.ts'
 import {
@@ -447,6 +448,14 @@ export interface InstallOptions {
   renderImage?: ImageRenderer
 }
 
+interface RenderRequest {
+  content: readonly ShareMessage[]
+  epoch: number
+  locale: 'zh' | 'en'
+  preservePreview: boolean
+  settings: ShareSettings
+}
+
 interface Translation {
   title: string
   selectedTitle(count: number): string
@@ -745,6 +754,27 @@ class PreviewDialog {
     this.open()
   }
 
+  /** 设置连续变化时先保留当前预览，只更新轻量状态；Markdown 与图片稍后统一重算。 */
+  showPendingUpdate(): void {
+    const strings = t(this.document)
+    const canPreserve = this.blob !== undefined && this.objectUrl !== undefined
+    this.element.ariaBusy = 'true'
+    this.copyButton.disabled = true
+    this.downloadButton.disabled = true
+    this.markdownButton.disabled = true
+    if (canPreserve) {
+      this.message.hidden = true
+      this.image.hidden = false
+      this.status.textContent = strings.updating
+    } else {
+      this.message.hidden = false
+      this.message.textContent = strings.loading
+      this.image.hidden = true
+      this.status.textContent = ''
+    }
+    this.open()
+  }
+
   /** 先在独立 img 中完成解码，再原位替换当前预览，避免出现空白帧。 */
   async showResult(blob: Blob, isCurrent: () => boolean = () => true): Promise<boolean> {
     const nextObjectUrl = URL.createObjectURL(blob)
@@ -932,13 +962,16 @@ export interface ShareSelectionSnapshot {
   total: number
 }
 
-interface SelectableTurn extends SelectedTurn {
+interface SelectableTurn {
   answerAnchors: HTMLElement[]
+  content: TurnContent
+  id: string
   questionAnchor: HTMLElement
+  turn: number
 }
 
 interface SessionSelection extends ObservableSnapshot<ShareSelectionSnapshot> {
-  available: Map<string, SelectedTurn>
+  available: Map<string, SelectableTurn>
   contentClickHandler?: EventListener
   footer?: HTMLElement
   listeners: Set<() => void>
@@ -949,6 +982,7 @@ interface SessionSelection extends ObservableSnapshot<ShareSelectionSnapshot> {
   selected: Map<string, SelectedTurn>
   selectNewTurns: boolean
   sessionId: string
+  snapshots: Map<string, SelectedTurn>
   snapshot: ShareSelectionSnapshot
 }
 
@@ -969,17 +1003,30 @@ function selectableTurns(root: ParentNode): SelectableTurn[] {
     if (!questionAnchor || content.answers.length === 0) continue
     turns.push({
       answerAnchors: content.answers,
-      content: {
-        prompts: snapshotElements(content.prompts),
-        answers: snapshotElements(content.answers),
-        tail: content.tail,
-      },
+      content,
       id: String(turn),
       questionAnchor,
       turn,
     })
   }
   return turns.sort((left, right) => left.turn - right.turn)
+}
+
+const SELECTION_OWNED_SELECTOR = [
+  '[data-dsh-share-selection-footer]',
+  '[data-dsh-share-select-region]',
+].join(',')
+
+function isSelectionOwnedNode(node: Node): boolean {
+  const element = node instanceof Element ? node : node.parentElement
+  return Boolean(element?.matches(SELECTION_OWNED_SELECTOR) || element?.closest(SELECTION_OWNED_SELECTOR))
+}
+
+/** 插件自己的 footer、勾选框和文案更新不应再次触发整轮扫描。 */
+function mutationNeedsSelectionRefresh(record: MutationRecord): boolean {
+  if (isSelectionOwnedNode(record.target)) return false
+  const changedNodes = [...record.addedNodes, ...record.removedNodes]
+  return changedNodes.length === 0 || changedNodes.some(node => !isSelectionOwnedNode(node))
 }
 
 function makeButton(document: Document, dataName: string): HTMLButtonElement {
@@ -1017,6 +1064,9 @@ export function createShareRuntime(document: Document, options: InstallOptions =
   let activeContent: readonly ShareMessage[] | undefined
   let activeGroupCount = 0
   let renderEpoch = 0
+  let pendingRender: RenderRequest | undefined
+  let renderRunning = false
+  let settingsRenderTimer: number | undefined
   let dialog: PreviewDialog
   const selections = new Map<string, SessionSelection>()
 
@@ -1049,6 +1099,7 @@ export function createShareRuntime(document: Document, options: InstallOptions =
       selected: new Map(),
       selectNewTurns: true,
       sessionId,
+      snapshots: new Map(),
       snapshot: { active: false, allSelected: false, count: 0, selectedIds: new Set(), total: 0 },
       listeners,
       getSnapshot: () => controller.snapshot,
@@ -1134,7 +1185,20 @@ export function createShareRuntime(document: Document, options: InstallOptions =
     controller.available.clear()
     controller.selected.clear()
     controller.selectNewTurns = true
+    controller.snapshots.clear()
     publishSelection(controller, false)
+  }
+
+  const snapshotTurn = (controller: SessionSelection, turn: SelectableTurn): SelectedTurn => {
+    const existing = controller.snapshots.get(turn.id)
+    if (existing) return existing
+    const snapshot: SelectedTurn = {
+      content: snapshotTurnContent(turn.content),
+      id: turn.id,
+      turn: turn.turn,
+    }
+    controller.snapshots.set(turn.id, snapshot)
+    return snapshot
   }
 
   const toggleSelection = (controller: SessionSelection, turnId: string): void => {
@@ -1143,7 +1207,7 @@ export function createShareRuntime(document: Document, options: InstallOptions =
     if (!turn) return
     controller.selectNewTurns = false
     if (controller.selected.has(turnId)) controller.selected.delete(turnId)
-    else controller.selected.set(turnId, turn)
+    else controller.selected.set(turnId, snapshotTurn(controller, turn))
     publishSelection(controller, true)
   }
 
@@ -1152,7 +1216,9 @@ export function createShareRuntime(document: Document, options: InstallOptions =
       controller.selected.clear()
       controller.selectNewTurns = false
     } else {
-      controller.selected = new Map(controller.available)
+      controller.selected = new Map(
+        [...controller.available.values()].map(turn => [turn.id, snapshotTurn(controller, turn)]),
+      )
       controller.selectNewTurns = true
     }
     publishSelection(controller, true)
@@ -1257,14 +1323,10 @@ export function createShareRuntime(document: Document, options: InstallOptions =
     const scroll = controller.scroll
     if (!scroll || !controller.snapshot.active) return
     for (const turn of selectableTurns(scroll)) {
-      if (!controller.available.has(turn.id)) {
-        const stored: SelectedTurn = {
-          content: turn.content,
-          id: turn.id,
-          turn: turn.turn,
-        }
-        controller.available.set(turn.id, stored)
-        if (controller.selectNewTurns) controller.selected.set(turn.id, stored)
+      const isNew = !controller.available.has(turn.id)
+      controller.available.set(turn.id, turn)
+      if (isNew && controller.selectNewTurns) {
+        controller.selected.set(turn.id, snapshotTurn(controller, turn))
       }
       attachSelectionButtons(controller, turn)
     }
@@ -1321,39 +1383,105 @@ export function createShareRuntime(document: Document, options: InstallOptions =
     return footer
   }
 
-  const renderContent = async (
+  const clearSettingsRenderTimer = (): void => {
+    if (settingsRenderTimer === undefined) return
+    document.defaultView?.clearTimeout(settingsRenderTimer)
+    settingsRenderTimer = undefined
+  }
+
+  const createRenderRequest = (
     content: readonly ShareMessage[],
     groupCount: number,
     preservePreview = false,
-  ): Promise<void> => {
-    const epoch = ++renderEpoch
+    epoch = ++renderEpoch,
+  ): RenderRequest => {
     const locale = getLocale(document)
-    const markdown = createShareMarkdown(content, locale, dialog.settings)
+    const settings = dialog.settings
+    const markdown = createShareMarkdown(content, locale, settings)
     dialog.showLoading(markdown, groupCount, preservePreview, true)
-    const card = createShareCard(document, content, locale, dialog.settings)
+    return { content, epoch, locale, preservePreview, settings }
+  }
+
+  const executeRender = async (request: RenderRequest): Promise<void> => {
+    const card = createShareCard(document, request.content, request.locale, request.settings)
     try {
       const blob = await renderImage(card.element)
-      if (epoch === renderEpoch) {
-        await dialog.showResult(blob, () => epoch === renderEpoch)
+      if (request.epoch === renderEpoch) {
+        await dialog.showResult(blob, () => request.epoch === renderEpoch)
       }
     } catch (error) {
-      if (epoch === renderEpoch) {
+      if (request.epoch === renderEpoch) {
         console.warn('[dsh-share] Failed to render conversation image', error)
-        dialog.showError(preservePreview)
+        dialog.showError(request.preservePreview)
       }
     } finally {
       card.dispose()
     }
   }
 
+  /** 图片生成不可取消，因此只允许一个画布任务运行；等待中的请求只保留最新一次。 */
+  const drainRenderQueue = async (): Promise<void> => {
+    if (renderRunning) return
+    renderRunning = true
+    try {
+      while (pendingRender) {
+        const request = pendingRender
+        pendingRender = undefined
+        await executeRender(request)
+      }
+    } finally {
+      renderRunning = false
+      if (pendingRender) void drainRenderQueue()
+    }
+  }
+
+  const renderContent = (
+    content: readonly ShareMessage[],
+    groupCount: number,
+    preservePreview = false,
+  ): void => {
+    clearSettingsRenderTimer()
+    pendingRender = createRenderRequest(content, groupCount, preservePreview)
+    void drainRenderQueue()
+  }
+
+  const scheduleSettingsRender = (
+    content: readonly ShareMessage[],
+    groupCount: number,
+  ): void => {
+    clearSettingsRenderTimer()
+    pendingRender = undefined
+    const epoch = ++renderEpoch
+    dialog.showPendingUpdate()
+    const window = document.defaultView
+    if (!window) {
+      pendingRender = createRenderRequest(content, groupCount, true, epoch)
+      void drainRenderQueue()
+      return
+    }
+    // 连续点击宽度、字号或过程开关时，只渲染用户最终停留的设置。
+    settingsRenderTimer = window.setTimeout(() => {
+      settingsRenderTimer = undefined
+      if (epoch !== renderEpoch) return
+      pendingRender = createRenderRequest(content, groupCount, true, epoch)
+      void drainRenderQueue()
+    }, 80)
+  }
+
+  const invalidateRenderQueue = (): void => {
+    clearSettingsRenderTimer()
+    pendingRender = undefined
+    renderEpoch += 1
+  }
+
   dialog = new PreviewDialog(document, {
     onSettingsChange: () => {
-      if (activeContent) void renderContent(activeContent, activeGroupCount, true)
+      if (activeContent) scheduleSettingsRender(activeContent, activeGroupCount)
     },
     onDismiss: () => {
       activeContent = undefined
       activeGroupCount = 0
-      renderEpoch += 1
+      invalidateRenderQueue()
     },
   })
 
@@ -1392,14 +1520,16 @@ export function createShareRuntime(document: Document, options: InstallOptions =
     refreshSelection(controller)
     if (initialTurn !== undefined) {
       const selected = controller.available.get(String(initialTurn))
-      if (selected) controller.selected.set(selected.id, selected)
+      if (selected) controller.selected.set(selected.id, snapshotTurn(controller, selected))
     }
     controller.footer = createSelectionFooter(controller)
     scroll.append(controller.footer)
     publishSelection(controller, true)
     const MutationObserverConstructor = document.defaultView?.MutationObserver
     if (MutationObserverConstructor) {
-      controller.observer = new MutationObserverConstructor(() => scheduleRefresh(controller))
+      controller.observer = new MutationObserverConstructor((records) => {
+        if (records.some(mutationNeedsSelectionRefresh)) scheduleRefresh(controller)
+      })
       controller.observer.observe(scroll, { childList: true, subtree: true })
     }
     preserveScrollPosition(scroll, scrollTop)
@@ -1427,12 +1557,13 @@ export function createShareRuntime(document: Document, options: InstallOptions =
       disposed = true
       activeContent = undefined
       activeGroupCount = 0
-      renderEpoch += 1
+      invalidateRenderQueue()
       for (const controller of selections.values()) {
         cleanupSelectionDom(controller)
         controller.listeners.clear()
         controller.available.clear()
         controller.selected.clear()
+        controller.snapshots.clear()
       }
       selections.clear()
       style.remove()
