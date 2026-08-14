@@ -3,6 +3,9 @@
 packages:
   - '.'
 autoInstallPeers: true
+minimumReleaseAge: 10080
 minimumReleaseAgeExclude:
   - '@deepseek-ai/*'
+blockExoticSubdeps: true
+trustPolicy: no-downgrade
 nodeLinker: hoisted
