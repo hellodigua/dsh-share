@@ -1,4 +1,4 @@
-import type { TurnContent } from './dom.ts'
+import type { ShareMessage } from './content.ts'
 import {
   DEFAULT_SHARE_SETTINGS,
   FONT_SIZE_PRESETS,
@@ -71,7 +71,7 @@ function cloneToolCallSummary(
   return clone
 }
 
-function cloneMessage(
+export function cloneShareMessage(
   source: HTMLElement,
   locale: 'zh' | 'en',
   hideReasoning = false,
@@ -110,6 +110,16 @@ function cloneMessage(
     width: '100%',
   })
   return clone
+}
+
+/** 与图片和 Markdown 共用的回答过程过滤规则。 */
+export function visibleAssistantElements(
+  elements: readonly HTMLElement[],
+  hideProcess: boolean,
+): HTMLElement[] {
+  return hideProcess
+    ? elements.filter(element => element.dataset.chatFlowKind === 'assistant-step').slice(-1)
+    : [...elements]
 }
 
 function createBrandWordmark(document: Document): HTMLElement {
@@ -155,7 +165,7 @@ function createBrandWordmark(document: Document): HTMLElement {
 
 export function createShareCard(
   document: Document,
-  content: TurnContent,
+  messages: readonly ShareMessage[],
   locale: 'zh' | 'en',
   settings: ShareSettings = DEFAULT_SHARE_SETTINGS,
 ): ShareCard {
@@ -183,21 +193,49 @@ export function createShareCard(
     wordBreak: 'break-word',
   })
 
-  const promptSection = document.createElement('section')
-  for (const prompt of content.prompts) promptSection.append(cloneMessage(prompt, locale))
-  applyStyles(promptSection, { marginBottom: '30px' })
-  card.append(promptSection)
+  for (const [index, message] of messages.entries()) {
+    if (message.omittedBefore > 0) {
+      const omission = document.createElement('div')
+      omission.dataset.dshShareOmission = ''
+      omission.textContent = '···'
+      applyStyles(omission, {
+        color: 'var(--dsw-alias-label-tertiary, #9ca3af)',
+        fontSize: '18px',
+        letterSpacing: '8px',
+        margin: '30px 0',
+        textAlign: 'center',
+      })
+      card.append(omission)
+    }
 
-  const answerSection = document.createElement('section')
-  // 隐藏过程时只保留最后一个 assistant-step，并从中移除 Think；工具调用和
-  // 中间步骤都不会进入图片，但用户在过程中的补充信息仍作为提问保留。
-  const answers = settings.hideProcess
-    ? content.answers.filter(answer => answer.dataset.chatFlowKind === 'assistant-step').slice(-1)
-    : content.answers
-  for (const answer of answers) {
-    answerSection.append(cloneMessage(answer, locale, settings.hideProcess))
+    const messageSection = document.createElement('section')
+    messageSection.dataset.dshShareMessageGroup = message.role
+    messageSection.dataset.dshShareTurn = String(message.turn)
+    if (index > 0 && message.omittedBefore === 0) {
+      const previous = messages[index - 1]
+      applyStyles(messageSection, {
+        borderTop: previous?.turn === message.turn
+          ? '0'
+          : '1px solid var(--dsw-alias-line-border, rgba(127, 127, 127, 0.16))',
+        marginTop: '30px',
+        paddingTop: previous?.turn === message.turn ? '0' : '30px',
+      })
+    }
+
+    const visible = message.role === 'assistant'
+      ? visibleAssistantElements(message.elements, settings.hideProcess)
+      : message.elements
+    // 隐藏过程时，一条回答只保留最后一个 assistant-step，并从中移除 Think；
+    // 工具调用和中间步骤不会进入图片，用户消息不受该开关影响。
+    for (const element of visible) {
+      messageSection.append(cloneShareMessage(
+        element,
+        locale,
+        message.role === 'assistant' && settings.hideProcess,
+      ))
+    }
+    card.append(messageSection)
   }
-  card.append(answerSection)
 
   const footer = document.createElement('footer')
   footer.append(createBrandWordmark(document))

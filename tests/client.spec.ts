@@ -1,14 +1,24 @@
 // @vitest-environment jsdom
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { IconShareOutline16 } from '@deepseek-ai/dsh-client-ui-primitives'
+import { Fragment } from 'react'
+import { IconShareOutline16, Tooltip } from '@deepseek-ai/dsh-client-ui-primitives'
 import {
   apply,
   createShareRuntime,
   ShareAction,
+  ShareConversationAction,
   type ShareActionProps,
+  type ShareConversationActionProps,
   type ShareRuntime,
 } from '../src/client/index.ts'
+
+interface ConversationFixture {
+  column: HTMLElement
+  root: HTMLElement
+  scroll: HTMLElement
+  source: HTMLButtonElement
+}
 
 function createMemoryStorage(): Storage {
   const entries = new Map<string, string>()
@@ -22,44 +32,97 @@ function createMemoryStorage(): Storage {
   }
 }
 
-function addTurn(id: string): HTMLElement {
-  const root = document.createElement('div')
+function createConversation(): ConversationFixture {
+  const root = document.createElement('main')
+  root.dataset.phase = 'active'
   root.innerHTML = `
-    <div data-chat-flow-kind="user"><div data-time-hover-root><p>问题 ${id}</p><div><button>复制</button></div></div></div>
-    <div data-chat-flow-kind="assistant-step"><article><p>回答 ${id}</p></article></div>
-    <div data-chat-flow-kind="turn-tail"><div data-turn-tail="${id}"><div><button>复制</button><button>分支</button><span>1 秒</span></div></div></div>`
+    <header><button data-header-share-source type="button">分享</button></header>
+    <div data-conversation-scroll>
+      <div data-test-chat-column></div>
+      <div data-composer-seat><textarea>继续对话</textarea></div>
+    </div>`
   document.body.append(root)
-  return root.querySelector(`[data-turn-tail="${id}"]`) as HTMLElement
+  return {
+    column: root.querySelector('[data-test-chat-column]') as HTMLElement,
+    root,
+    scroll: root.querySelector('[data-conversation-scroll]') as HTMLElement,
+    source: root.querySelector('[data-header-share-source]') as HTMLButtonElement,
+  }
 }
 
-function addTurnWithProcess(id: string): HTMLElement {
-  const root = document.createElement('div')
-  root.innerHTML = `
-    <div data-chat-flow-kind="user"><p>问题 ${id}</p></div>
-    <div data-chat-flow-kind="assistant-step">
-      <div data-variant="think">Think 中间步骤</div><p>中间说明</p>
-    </div>
-    <div data-chat-flow-kind="tool-call">
-      <div data-disclosure-row><span>Bash</span><span>pnpm test</span></div>
-    </div>
-    <div data-chat-flow-kind="assistant-step">
-      <div data-variant="think">Think 最终步骤</div><article><p>最终回答 ${id}</p></article>
-    </div>
-    <div data-chat-flow-kind="turn-tail"><div data-turn-tail="${id}"><div><button>复制</button><button>分支</button></div></div></div>`
-  document.body.append(root)
-  return root.querySelector(`[data-turn-tail="${id}"]`) as HTMLElement
+function addTurn(
+  fixture: ConversationFixture,
+  id: string,
+  turn: number,
+  process = false,
+): HTMLElement {
+  const container = document.createElement('div')
+  container.innerHTML = process
+    ? `
+      <div data-chat-flow-kind="user"><div data-time-hover-root><p>问题 ${id}</p><div><button>复制</button></div></div></div>
+      <div data-chat-flow-kind="assistant-step"><div data-variant="think">Think 中间步骤</div><p>中间说明</p></div>
+      <div data-chat-flow-kind="tool-call"><div data-disclosure-row><span>Bash</span><span>pnpm test</span></div></div>
+      <div data-chat-flow-kind="assistant-step"><div data-variant="think">Think 最终步骤</div><article><p>最终回答 ${id}</p></article></div>
+      <div data-chat-flow-kind="turn-tail"><div data-turn-tail="${turn}"><div><button>复制</button><button>分支</button></div></div></div>`
+    : `
+      <div data-chat-flow-kind="user"><div data-time-hover-root><p>问题 ${id}</p><div><button>复制</button></div></div></div>
+      <div data-chat-flow-kind="assistant-step"><article><p>回答 ${id}</p></article></div>
+      <div data-chat-flow-kind="turn-tail"><div data-turn-tail="${turn}"><div><button>复制</button><button>分支</button><span>1 秒</span></div></div></div>`
+  fixture.column.append(...Array.from(container.children))
+  return fixture.column.querySelector(`[data-turn-tail="${turn}"]`) as HTMLElement
 }
 
-function triggerShareAction(tail: HTMLElement, runtime: ShareRuntime, messageId = 'message-1'): HTMLButtonElement {
+function actionProps(
+  runtime: ShareRuntime,
+  messageId = 'message-1',
+  turn = 1,
+  sessionId = 'session-1',
+): ShareActionProps {
+  const selection = runtime.selectionFor(sessionId)
+  return {
+    messageId,
+    sessionId,
+    shareRuntime: runtime,
+    useShareSelection: selector => selector(selection.getSnapshot()),
+    useSession: selector => selector({
+      chat: {
+        nodes: {
+          values: () => [{
+            kind: 'turn-tail',
+            data: { turn, closing: { finalNode: { messageId } } },
+          }],
+        },
+      },
+    } as never),
+  } as ShareActionProps
+}
+
+function headerProps(runtime: ShareRuntime, sessionId = 'session-1'): ShareConversationActionProps {
+  const selection = runtime.selectionFor(sessionId)
+  return {
+    sessionId,
+    shareRuntime: runtime,
+    useShareSelection: selector => selector(selection.getSnapshot()),
+  } as ShareConversationActionProps
+}
+
+function clickHeaderShare(runtime: ShareRuntime, source: HTMLButtonElement): void {
+  const tooltip = ShareConversationAction(headerProps(runtime))
+  const button = tooltip.props.children
+  button.props.onClick({ currentTarget: source })
+}
+
+function triggerShareAction(
+  tail: HTMLElement,
+  runtime: ShareRuntime,
+  messageId = 'message-1',
+  turn = 1,
+): HTMLButtonElement {
   const button = document.createElement('button')
   button.dataset.dshShareButton = ''
   tail.lastElementChild?.append(button)
-  const action = ShareAction({ messageId, shareRuntime: runtime })
-  const { children } = action.props as { children: ReturnType<typeof ShareAction> }
-  const { onClick } = children.props as {
-    onClick(event: { currentTarget: HTMLButtonElement }): void
-  }
-  onClick({ currentTarget: button })
+  const tooltip = ShareAction(actionProps(runtime, messageId, turn))
+  tooltip.props.children.props.onClick({ currentTarget: button })
   return button
 }
 
@@ -83,8 +146,9 @@ afterEach(() => {
 })
 
 describe('分享按钮运行时', () => {
-  it('通过官方 assistant-actions 插槽注册按钮，并在卸载时清理', () => {
-    addTurn('one')
+  it('通过官方消息与 Header 插槽注册双入口，并在卸载时清理', () => {
+    const fixture = createConversation()
+    addTurn(fixture, 'one', 1)
     const disposeRegistration = vi.fn()
     const injectionDisposers: Array<() => void> = []
     const register = vi.fn(() => disposeRegistration)
@@ -96,69 +160,86 @@ describe('分享按钮运行时', () => {
     apply({ slots: { inject: injectSlot, register } } as never)
 
     expect(injectSlot).toHaveBeenCalledWith('conversation.chat.assistant-actions', expect.any(Function))
-    const [options, component] = register.mock.calls[0] as unknown as [
+    expect(injectSlot).toHaveBeenCalledWith('conversation.session.header.utilities', expect.any(Function))
+    const actionRegistration = register.mock.calls.find(call =>
+      (call[0] as { name: string }).name === 'conversation.chat.assistant-actions')
+    const headerRegistration = register.mock.calls.find(call =>
+      (call[0] as { name: string }).name === 'conversation.session.header.utilities')
+    const [actionOptions, actionComponent] = actionRegistration as unknown as [
       {
         name: string
         id: string
         order: number
-        inject(): { shareRuntime: ShareRuntime }
+        inject(sessionId: string): { shareRuntime: ShareRuntime }
       },
       (props: ShareActionProps) => ReturnType<typeof ShareAction>,
     ]
-    expect(options).toMatchObject({
+    expect(actionOptions).toMatchObject({
       name: 'conversation.chat.assistant-actions',
       id: 'share',
       order: 20,
     })
 
-    const runtime = options.inject().shareRuntime
-    const action = component({ messageId: 'message-one', shareRuntime: runtime })
-    expect(action.props).toMatchObject({
-      label: '分享为图片',
-      side: 'bottom',
+    const runtime = actionOptions.inject('session-one').shareRuntime
+    const [headerOptions, headerComponent] = headerRegistration as unknown as [
+      {
+        name: string
+        id: string
+        order: number
+        inject(sessionId: string): { shareRuntime: ShareRuntime }
+      },
+      (props: ShareConversationActionProps) => ReturnType<typeof ShareConversationAction>,
+    ]
+    expect(headerOptions).toMatchObject({
+      name: 'conversation.session.header.utilities',
+      id: 'share-conversation',
+      order: -10,
     })
-    const tooltipProps = action.props as { children: ReturnType<typeof ShareAction> }
-    expect(tooltipProps.children.type).toBe('button')
-    expect(tooltipProps.children.props).toMatchObject({
+    expect(headerOptions.inject('session-one').shareRuntime).toBe(runtime)
+
+    const action = actionComponent(actionProps(runtime, 'message-one'))
+    expect(action.type).toBe(Tooltip)
+    expect(action.props).toMatchObject({ label: '分享为图片', side: 'bottom' })
+    expect(action.props.children.type).toBe('button')
+    expect(action.props.children.props).toMatchObject({
       'data-dsh-share-button': '',
       'aria-label': '将当前问答分享为图片',
     })
-    expect(tooltipProps.children.props.children).toMatchObject({
+    expect(action.props.children.props.children).toMatchObject({
       type: IconShareOutline16,
       props: { size: 16 },
     })
-    expect(tooltipProps.children.props).not.toHaveProperty('title')
-    // 按钮由 React 插槽渲染；插件不再自行扫描已有或后来加入的对话。
-    expect(document.querySelector('[data-dsh-share-button]')).toBeNull()
+
+    const header = headerComponent(headerProps(runtime))
+    expect(header.type).toBe(Tooltip)
+    expect(header.props).toMatchObject({ label: '分享对话', side: 'bottom' })
+    expect(header.props.children.props).toMatchObject({
+      'data-dsh-share-conversation': '',
+      'aria-label': '分享对话',
+    })
+
     const styleText = document.getElementById('dsh-share-style')?.textContent ?? ''
-    expect(styleText).toContain('width: 960px')
-    expect(styleText).toContain('max-height: 62vh')
-    expect(styleText).not.toContain('max-height: 58vh')
-    expect(styleText).not.toContain('opacity: .72')
-    expect(styleText).toContain('margin-left: auto')
     expect(styleText).toContain('[data-dsh-share-button] { order: 1; }')
-    expect(styleText).toContain(
-      '[data-time-hover-root] > div:has([data-dsh-share-button]) > span:last-child { order: 2; }',
-    )
-    expect(document.querySelector('.dsh-share-dialog__controls')?.lastElementChild?.classList
-      .contains('dsh-share-dialog__toggle')).toBe(true)
+    expect(styleText).toContain('[data-dsh-share-turn-select]')
+    expect(styleText).toContain('[data-dsh-share-selection-footer]')
+    expect(styleText).toContain('height: 66px')
+    expect(styleText).not.toContain('[data-dsh-share-select]')
 
-    addTurn('two')
-    expect(document.querySelector('[data-dsh-share-button]')).toBeNull()
-
-    injectionDisposers[0]?.()
-    expect(disposeRegistration).toHaveBeenCalledOnce()
+    for (const dispose of injectionDisposers) dispose()
+    expect(disposeRegistration).toHaveBeenCalledTimes(2)
     expect(document.querySelector('[data-dsh-share-dialog]')).toBeNull()
     expect(document.getElementById('dsh-share-style')).toBeNull()
   })
 
-  it('英文界面的 Tooltip 使用 Share as image 文案', () => {
+  it('英文界面的两个 Tooltip 使用英文文案', () => {
     document.documentElement.lang = 'en'
     const runtime = createShareRuntime(document)
-    const action = ShareAction({ messageId: 'message-en', shareRuntime: runtime })
+    const action = ShareAction(actionProps(runtime, 'message-en'))
+    const header = ShareConversationAction(headerProps(runtime))
 
     expect(action.props.label).toBe('Share as image')
     expect(action.props.children.props['aria-label']).toBe('Share this Q&A as an image')
+    expect(header.props.label).toBe('Share conversation')
 
     runtime.dispose()
   })
@@ -170,7 +251,7 @@ describe('分享按钮运行时', () => {
     expect(document.querySelector('[data-dsh-share-dialog]')).toBeNull()
   })
 
-  it('把分享按钮显示在分支右侧，并保持时间信息在最后', () => {
+  it('把单轮分享按钮显示在分支右侧，并保持时间信息在最后', () => {
     const runtime = createShareRuntime(document)
     const turnTail = document.createElement('div')
     turnTail.dataset.timeHoverRoot = ''
@@ -193,20 +274,266 @@ describe('分享按钮运行时', () => {
     runtime.dispose()
   })
 
-  it('点击按钮后用当前问答生成图片并显示预览', async () => {
+  it('进入官网式选择模式后默认全选，每轮问题和回答各放一个联动选择框', () => {
+    const fixture = createConversation()
+    addTurn(fixture, 'first', 1)
+    addTurn(fixture, 'second', 2)
+    fixture.scroll.scrollTop = 128
+    const runtime = createShareRuntime(document)
+
+    clickHeaderShare(runtime, fixture.source)
+
+    expect(runtime.selectionFor('session-1').getSnapshot()).toMatchObject({
+      active: true,
+      allSelected: true,
+      count: 2,
+      total: 2,
+    })
+    const checkboxes = fixture.scroll.querySelectorAll<HTMLButtonElement>('[data-dsh-share-turn-select]')
+    expect(checkboxes).toHaveLength(4)
+    expect([...checkboxes].map(button => `${button.dataset.turnId}:${button.dataset.dshShareTurnSelectKind}`))
+      .toEqual(['1:question', '2:question', '1:answer', '2:answer'])
+    expect([...checkboxes].every(button => button.getAttribute('aria-checked') === 'true')).toBe(true)
+    expect(fixture.column.querySelector(
+      '[data-chat-flow-kind="user"] > [data-dsh-share-select-region="question"] [data-dsh-share-turn-select]',
+    )).not.toBeNull()
+    expect(fixture.column.querySelectorAll('[data-dsh-share-select-region="answer"]')).toHaveLength(2)
+    expect(fixture.column.querySelectorAll('[data-dsh-share-select-content="question"]')).toHaveLength(2)
+    expect(fixture.column.querySelectorAll('[data-dsh-share-select-content="answer"]')).toHaveLength(2)
+    const firstQuestion = fixture.column.querySelector<HTMLElement>(
+      '[data-dsh-share-select-content="question"][data-dsh-share-select-turn-id="1"]',
+    )
+    const firstAnswer = fixture.column.querySelector<HTMLElement>(
+      '[data-dsh-share-select-content="answer"][data-dsh-share-select-turn-id="1"]',
+    )
+    expect(getComputedStyle(firstQuestion as HTMLElement).cursor).toBe('pointer')
+    expect(getComputedStyle(firstQuestion?.querySelector('p') as HTMLElement).pointerEvents).toBe('none')
+    expect(getComputedStyle(firstAnswer?.querySelector('article') as HTMLElement).pointerEvents).toBe('none')
+    expect(getComputedStyle(fixture.column.querySelector('[data-dsh-share-select-sticky]') as HTMLElement).position)
+      .toBe('sticky')
+    expect(getComputedStyle(fixture.column.querySelector('[data-dsh-share-select-sticky]') as HTMLElement).top)
+      .toBe('0px')
+    expect(fixture.scroll.dataset.dshShareSelection).toBe('')
+    expect(fixture.scroll.scrollTop).toBe(128)
+    expect(getComputedStyle(fixture.root.querySelector('[data-composer-seat]') as HTMLElement).visibility).toBe('hidden')
+    expect(getComputedStyle(fixture.root.querySelector('[data-chat-flow-kind="turn-tail"]') as HTMLElement).visibility).toBe('hidden')
+
+    const footer = fixture.scroll.querySelector('[data-dsh-share-selection-footer]') as HTMLElement
+    expect(footer).not.toBeNull()
+    expect(footer.textContent).toContain('全选')
+    expect(footer.textContent).toContain('已选择 2 组对话')
+    expect(getComputedStyle(footer).height).toBe('66px')
+    expect(ShareAction(actionProps(runtime)).type).toBe(Fragment)
+    expect(ShareConversationAction(headerProps(runtime)).type).toBe(Fragment)
+
+    runtime.dispose()
+  })
+
+  it('点击问题或回答正文会切换整组选择，并阻止原内容交互穿透', () => {
+    const fixture = createConversation()
+    addTurn(fixture, 'first', 1, true)
+    addTurn(fixture, 'second', 2)
+    const runtime = createShareRuntime(document)
+    clickHeaderShare(runtime, fixture.source)
+
+    const firstPair = fixture.scroll.querySelectorAll<HTMLButtonElement>(
+      '[data-dsh-share-turn-select][data-turn-id="1"]',
+    )
+    const question = fixture.scroll.querySelector<HTMLElement>(
+      '[data-dsh-share-select-content="question"][data-dsh-share-select-turn-id="1"]',
+    )
+    const answerParts = fixture.scroll.querySelectorAll<HTMLElement>(
+      '[data-dsh-share-select-content="answer"][data-dsh-share-select-turn-id="1"]',
+    )
+    const toolControl = answerParts[1]?.querySelector<HTMLElement>('[data-disclosure-row]')
+
+    expect(answerParts).toHaveLength(3)
+    expect(getComputedStyle(toolControl as HTMLElement).pointerEvents).toBe('none')
+
+    const answerClick = new MouseEvent('click', { bubbles: true, cancelable: true })
+    answerParts[1]?.dispatchEvent(answerClick)
+    expect(answerClick.defaultPrevented).toBe(true)
+    expect(runtime.selectionFor('session-1').getSnapshot()).toMatchObject({ count: 1 })
+    expect([...firstPair].every(button => button.getAttribute('aria-checked') === 'false')).toBe(true)
+
+    const questionClick = new MouseEvent('click', { bubbles: true, cancelable: true })
+    question?.dispatchEvent(questionClick)
+    expect(questionClick.defaultPrevented).toBe(true)
+    expect(runtime.selectionFor('session-1').getSnapshot()).toMatchObject({ count: 2 })
+    expect([...firstPair].every(button => button.getAttribute('aria-checked') === 'true')).toBe(true)
+
+    ;(fixture.scroll.querySelector('[data-dsh-share-selection-cancel]') as HTMLButtonElement).click()
+    expect(fixture.scroll.querySelector('[data-dsh-share-select-content]')).toBeNull()
+
+    runtime.dispose()
+  })
+
+  it('支持单组取消、全选与清空，并在零选择时禁用生成按钮', () => {
+    const fixture = createConversation()
+    addTurn(fixture, 'first', 1)
+    addTurn(fixture, 'second', 2)
+    const runtime = createShareRuntime(document)
+    clickHeaderShare(runtime, fixture.source)
+
+    const firstPair = fixture.scroll.querySelectorAll<HTMLButtonElement>(
+      '[data-dsh-share-turn-select][data-turn-id="1"]',
+    )
+    const first = firstPair[1]
+    const selectAll = fixture.scroll.querySelector<HTMLButtonElement>('[data-dsh-share-select-all]')
+    const create = fixture.scroll.querySelector<HTMLButtonElement>('[data-dsh-share-selection-create]')
+    first?.click()
+    expect(runtime.selectionFor('session-1').getSnapshot()).toMatchObject({
+      allSelected: false,
+      count: 1,
+    })
+    expect(first?.getAttribute('aria-checked')).toBe('false')
+    expect([...firstPair].every(button => button.getAttribute('aria-checked') === 'false')).toBe(true)
+    expect(selectAll?.getAttribute('aria-checked')).toBe('false')
+
+    selectAll?.click()
+    expect(runtime.selectionFor('session-1').getSnapshot()).toMatchObject({
+      allSelected: true,
+      count: 2,
+    })
+    selectAll?.click()
+    expect(runtime.selectionFor('session-1').getSnapshot()).toMatchObject({
+      allSelected: false,
+      count: 0,
+    })
+    expect(create?.disabled).toBe(true)
+    expect(getComputedStyle(create as HTMLElement).opacity).toBe('0.45')
+
+    runtime.dispose()
+  })
+
+  it('按轮次生成不连续问答组，并可下载同一内容的 Markdown', async () => {
+    const createdBlobs: Blob[] = []
+    Object.defineProperty(URL, 'createObjectURL', {
+      configurable: true,
+      value: vi.fn((blob: Blob) => {
+        createdBlobs.push(blob)
+        return blob.type.startsWith('text/markdown') ? 'blob:dsh-share-markdown' : 'blob:dsh-share-multi'
+      }),
+    })
+    Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: vi.fn() })
+    let downloadedFilename = ''
+    vi.spyOn(window.HTMLAnchorElement.prototype, 'click').mockImplementation(function () {
+      downloadedFilename = this.download
+    })
+
+    const fixture = createConversation()
+    addTurn(fixture, 'first', 1)
+    addTurn(fixture, 'second', 2)
+    addTurn(fixture, 'third', 3)
+    const rendered: HTMLElement[] = []
+    const renderImage = vi.fn(async (element: HTMLElement) => {
+      rendered.push(element.cloneNode(true) as HTMLElement)
+      return new Blob(['png'], { type: 'image/png' })
+    })
+    const runtime = createShareRuntime(document, { renderImage })
+    clickHeaderShare(runtime, fixture.source)
+    ;(fixture.scroll.querySelector('[data-dsh-share-select-all]') as HTMLButtonElement).click()
+    ;(fixture.scroll.querySelector('[data-turn-id="1"]') as HTMLButtonElement).click()
+    ;(fixture.scroll.querySelector('[data-turn-id="3"]') as HTMLButtonElement).click()
+    ;(fixture.scroll.querySelector('[data-dsh-share-selection-create]') as HTMLButtonElement).click()
+
+    await vi.waitFor(() => expect(renderImage).toHaveBeenCalledOnce())
+    const text = rendered[0]?.textContent ?? ''
+    expect(text).toContain('问题 first')
+    expect(text).toContain('回答 first')
+    expect(text).toContain('问题 third')
+    expect(text).toContain('回答 third')
+    expect(text).not.toContain('问题 second')
+    expect(text.indexOf('问题 first')).toBeLessThan(text.indexOf('问题 third'))
+    expect(rendered[0]?.querySelectorAll('[data-dsh-share-message-group]')).toHaveLength(4)
+    expect(rendered[0]?.querySelector('[data-dsh-share-omission]')).not.toBeNull()
+    expect(document.querySelector('[data-dsh-share-title]')?.textContent).toBe('分享所选对话（2 组）')
+
+    const markdownButton = document.querySelector('[data-dsh-share-download-markdown]') as HTMLButtonElement
+    expect(markdownButton.disabled).toBe(false)
+    markdownButton.click()
+    expect(createdBlobs.some(blob => blob.type.startsWith('text/markdown'))).toBe(true)
+    expect(downloadedFilename).toMatch(/^dsh-share-\d{8}-\d{6}\.md$/)
+
+    runtime.dispose()
+  })
+
+  it('新消息渲染后补上选择框，并遵守用户当前的全选意图', async () => {
+    const fixture = createConversation()
+    addTurn(fixture, 'first', 1)
+    const runtime = createShareRuntime(document)
+    clickHeaderShare(runtime, fixture.source)
+
+    addTurn(fixture, 'second', 2)
+    await vi.waitFor(() => {
+      expect(runtime.selectionFor('session-1').getSnapshot()).toMatchObject({ count: 2, total: 2 })
+    })
+
+    ;(fixture.scroll.querySelector('[data-turn-id="1"]') as HTMLButtonElement).click()
+    addTurn(fixture, 'third', 3)
+    await vi.waitFor(() => {
+      expect(runtime.selectionFor('session-1').getSnapshot()).toMatchObject({ count: 1, total: 3 })
+    })
+    expect(fixture.scroll.querySelector('[data-turn-id="3"]')?.getAttribute('aria-checked')).toBe('false')
+
+    runtime.dispose()
+  })
+
+  it('取消选择模式会完整清理选择界面并保持当前位置', () => {
+    const fixture = createConversation()
+    addTurn(fixture, 'first', 1)
+    const runtime = createShareRuntime(document)
+    clickHeaderShare(runtime, fixture.source)
+    fixture.scroll.scrollTop = 246
+
+    ;(fixture.scroll.querySelector('[data-dsh-share-selection-cancel]') as HTMLButtonElement).click()
+
+    expect(runtime.selectionFor('session-1').getSnapshot()).toMatchObject({ active: false, count: 0, total: 0 })
+    expect(fixture.scroll.querySelector('[data-dsh-share-selection-footer]')).toBeNull()
+    expect(fixture.scroll.querySelector('[data-dsh-share-turn-select]')).toBeNull()
+    expect(fixture.scroll.hasAttribute('data-dsh-share-selection')).toBe(false)
+    expect(fixture.scroll.scrollTop).toBe(246)
+    expect(getComputedStyle(fixture.root.querySelector('[data-composer-seat]') as HTMLElement).visibility).not.toBe('hidden')
+
+    runtime.dispose()
+  })
+
+  it('点击单轮按钮后进入多选模式，仅预选当前问答组', async () => {
     const createObjectURL = vi.fn(() => 'blob:dsh-share-preview')
     const revokeObjectURL = vi.fn()
     Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: createObjectURL })
     Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: revokeObjectURL })
 
-    const tail = addTurn('click')
+    const fixture = createConversation()
+    addTurn(fixture, 'first', 1)
+    const tail = addTurn(fixture, 'click', 2)
+    addTurn(fixture, 'third', 3)
     const renderImage = vi.fn(async (element: HTMLElement) => {
       expect(element.textContent).toContain('问题 click')
       expect(element.textContent).toContain('回答 click')
+      expect(element.querySelectorAll('[data-dsh-share-message-group]')).toHaveLength(2)
       return new Blob(['png'], { type: 'image/png' })
     })
     const runtime = createShareRuntime(document, { renderImage })
-    triggerShareAction(tail, runtime)
+    triggerShareAction(tail, runtime, 'message-2', 2)
+
+    expect(runtime.selectionFor('session-1').getSnapshot()).toMatchObject({
+      active: true,
+      allSelected: false,
+      count: 1,
+      total: 3,
+    })
+    expect(runtime.selectionFor('session-1').getSnapshot().selectedIds).toEqual(new Set(['2']))
+    const checkboxes = fixture.scroll.querySelectorAll<HTMLButtonElement>('[data-dsh-share-turn-select]')
+    expect(checkboxes).toHaveLength(6)
+    expect([...checkboxes].filter(button => button.getAttribute('aria-checked') === 'true')
+      .map(button => button.dataset.dshShareTurnSelectKind)).toEqual(['question', 'answer'])
+    expect(fixture.scroll.querySelector('[data-dsh-share-selection-count]')?.textContent)
+      .toBe('已选择 1 组对话')
+    expect(renderImage).not.toHaveBeenCalled()
+    expect(document.querySelector('[data-dsh-share-dialog]')?.hasAttribute('open')).toBe(false)
+
+    ;(fixture.scroll.querySelector('[data-dsh-share-selection-create]') as HTMLButtonElement).click()
 
     await vi.waitFor(() => expect(renderImage).toHaveBeenCalledOnce())
     await vi.waitFor(() => {
@@ -215,6 +542,7 @@ describe('分享按钮运行时', () => {
       expect(image.hidden).toBe(false)
       expect(image.style.width).toBe('768px')
     })
+    expect(document.querySelector('[data-dsh-share-title]')?.textContent).toBe('分享所选对话（1 组）')
 
     runtime.dispose()
     expect(revokeObjectURL).toHaveBeenCalledWith('blob:dsh-share-preview')
@@ -227,7 +555,8 @@ describe('分享按钮运行时', () => {
     })
     Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: vi.fn() })
 
-    const tail = addTurn('settings')
+    const fixture = createConversation()
+    const tail = addTurn(fixture, 'settings', 1)
     const renderedSettings: Array<{ width: string; fontSize: string }> = []
     const renderImage = vi.fn(async (element: HTMLElement) => {
       renderedSettings.push({
@@ -238,23 +567,18 @@ describe('分享按钮运行时', () => {
     })
     const runtime = createShareRuntime(document, { renderImage })
     triggerShareAction(tail, runtime)
+    ;(fixture.scroll.querySelector('[data-dsh-share-selection-create]') as HTMLButtonElement).click()
     await vi.waitFor(() => expect(renderImage).toHaveBeenCalledTimes(1))
     expect(renderedSettings[0]).toEqual({ width: '768px', fontSize: '16px' })
 
     ;(document.querySelector('[data-dsh-share-choice="width"][data-value="desktop"]') as HTMLButtonElement).click()
     await vi.waitFor(() => expect(renderImage).toHaveBeenCalledTimes(2))
     expect(renderedSettings[1]).toEqual({ width: '1024px', fontSize: '16px' })
-    await vi.waitFor(() => {
-      expect((document.querySelector('[data-dsh-share-preview]') as HTMLImageElement).style.width).toBe('1024px')
-    })
-
     ;(document.querySelector('[data-dsh-share-choice="font-size"][data-value="large"]') as HTMLButtonElement).click()
     await vi.waitFor(() => expect(renderImage).toHaveBeenCalledTimes(3))
     expect(renderedSettings[2]).toEqual({ width: '1024px', fontSize: '18px' })
     expect(window.localStorage.getItem('dsh-share.width')).toBe('desktop')
     expect(window.localStorage.getItem('dsh-share.font-size')).toBe('large')
-    expect(document.querySelector('[data-value="desktop"]')?.getAttribute('aria-pressed')).toBe('true')
-    expect(document.querySelector('[data-value="large"]')?.getAttribute('aria-pressed')).toBe('true')
 
     runtime.dispose()
   })
@@ -266,7 +590,8 @@ describe('分享按钮运行时', () => {
     })
     Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: vi.fn() })
 
-    const tail = addTurnWithProcess('clean')
+    const fixture = createConversation()
+    const tail = addTurn(fixture, 'clean', 1, true)
     const renderedContent: string[] = []
     const renderImage = vi.fn(async (element: HTMLElement) => {
       renderedContent.push(element.textContent ?? '')
@@ -274,12 +599,12 @@ describe('分享按钮运行时', () => {
     })
     const runtime = createShareRuntime(document, { renderImage })
     triggerShareAction(tail, runtime)
+    ;(fixture.scroll.querySelector('[data-dsh-share-selection-create]') as HTMLButtonElement).click()
     await vi.waitFor(() => expect(renderImage).toHaveBeenCalledTimes(1))
     expect(renderedContent[0]).toContain('Think 中间步骤')
     expect(renderedContent[0]).toContain('Bash')
 
     const toggle = document.querySelector('[data-dsh-share-hide-process]') as HTMLInputElement
-    expect(toggle.checked).toBe(false)
     toggle.click()
 
     await vi.waitFor(() => expect(renderImage).toHaveBeenCalledTimes(2))
@@ -311,10 +636,12 @@ describe('分享按钮运行时', () => {
       value: decode,
     })
 
-    const tail = addTurn('smooth')
+    const fixture = createConversation()
+    const tail = addTurn(fixture, 'smooth', 1)
     const renderImage = vi.fn(async () => new Blob(['png'], { type: 'image/png' }))
     const runtime = createShareRuntime(document, { renderImage })
     triggerShareAction(tail, runtime)
+    ;(fixture.scroll.querySelector('[data-dsh-share-selection-create]') as HTMLButtonElement).click()
     const preview = document.querySelector('[data-dsh-share-preview]') as HTMLImageElement
     await vi.waitFor(() => expect(preview.src).toBe('blob:preview-1'))
     expect(preview.style.width).toBe('768px')

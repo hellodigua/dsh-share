@@ -2,7 +2,7 @@
   "name": "@dsh-external/dsh-share",
   "version": "0.1.0",
   "private": true,
-  "description": "Share a DSH conversation turn as a PNG image.",
+  "description": "Share DSH Q&As or selected conversation groups as PNG or Markdown.",
   "author": "digua <i@digua.me>",
   "keywords": [
     "deepseek-harness",
@@ -74,10 +74,13 @@
     "@deepseek-ai/dsh-client-ui-slots": "0.1.0-rc.6",
     "@types/node": "^24.0.0",
     "@types/react": "~18.3.1",
+    "@types/turndown": "^5.0.6",
     "html-to-image": "^1.11.13",
     "jsdom": "^26.1.0",
     "react": "^18.2.0",
     "tsdown": "^0.22.2",
+    "turndown": "^7.2.4",
+    "turndown-plugin-gfm": "^1.0.2",
     "typescript": "^6.0.3",
     "vitest": "^4.1.8"
   },

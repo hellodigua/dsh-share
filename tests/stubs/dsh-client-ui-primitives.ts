@@ -5,6 +5,10 @@ export function IconShareOutline16({ size = 16 }: { size?: number }): ReactEleme
   return createElement('svg', { 'data-official-share-icon': '', height: size, width: size })
 }
 
+export function IconCheckOutline16({ size = 16 }: { size?: number }): ReactElement {
+  return createElement('svg', { 'data-official-check-icon': '', height: size, width: size })
+}
+
 /** 单测只关心 Tooltip 收到的属性；真实交互由 DSH 官方组件负责。 */
 export function Tooltip({ children }: { children: ReactElement }): ReactElement {
   return children

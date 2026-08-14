@@ -2,13 +2,17 @@
 
 简体中文 | [English](./README.en.md)
 
-把 DSH 中的一轮问答生成 PNG 图片，可直接复制到剪贴板或下载。
+把 DSH 中的一轮问答或选中的多组问答生成 PNG 图片，也可以下载为 Markdown。
 
 ![dsh-share 分享图片预览](./assets/readme/share-dialog.webp)
 
 ## 功能
 
-- 在每轮回答末尾增加分享按钮，可复制或下载 PNG
+- 从右上角进入问答选择模式，默认全选
+- 每轮的分享按钮也会进入选择模式，并只预选当前问答
+- 问题和回答两侧都有联动勾选框，也可直接点击内容整组选择，支持不连续选择
+- 勾选框会在长内容滚动时吸附在页面上，到当前问题或回答末尾再移出
+- 可复制图片、下载 PNG 或 Markdown
 - 保留 Markdown、代码块、表格、图片和工具调用摘要
 - 可调整图片宽度和字号，长图支持滚动预览
 - 可勾选“不展示过程”，只保留提问和最终回答
@@ -75,7 +79,9 @@ tarball 已包含浏览器构建产物，安装时不需要执行第三方构建
 
 当前版本面向 npm `@deepseek-ai/dsh@0.1.0-rc.6`，DSH peers 声明为 `^0.1.0-rc.6`。本地开发使用精确 rc.6 类型包，部署时仍由 Web Profile 提供共享运行时。
 
-分享按钮通过官方 `conversation.chat.assistant-actions` 插槽挂载，并直接使用官方 Client 类型，不扫描或修改按钮栏 DOM。生成图片时会读取当前轮已经渲染的 `data-*` 节点，因此 DSH 调整对话内容结构后可能需要同步适配。
+单轮入口通过官方 `conversation.chat.assistant-actions` 插槽挂载，对话分享入口通过官方 `conversation.session.header.utilities` 插槽挂载，并直接使用官方 Client 类型，不扫描或修改按钮栏 DOM。
+
+DSH 暂未提供问答左侧装饰插槽。只有进入选择模式后，插件才会通过 `MutationObserver` 和官方页面稳定的 `data-conversation-scroll`、`data-chat-flow-kind`、`data-turn-tail` 属性，为已经渲染的问题和回答分别添加联动、可吸附的选择框；不依赖 CSS Module 生成的类名。选择模式中，内容里的链接、展开按钮等交互会暂时停用，点击问题或回答会切换整组选择，退出后恢复。DSH 调整这些页面数据属性或对话结构后，插件可能需要同步适配。
 
 ## 开发
 
@@ -101,6 +107,7 @@ corepack pnpm verify
 - 复制图片依赖浏览器 Clipboard API；权限不足时仍可下载 PNG。
 - 图片中的远程资源必须允许浏览器读取；无法读取的单个资源会用透明占位跳过，不影响整张 PNG 生成。
 - 超长图片在其他聊天软件中仍可能被整体缩放；插件弹窗只负责提供可滚动的清晰预览。
+- 问答组选择以页面已经加载的完整轮次为准；需要更早内容时，先向上滚动加载历史消息。
 
 ## License
 

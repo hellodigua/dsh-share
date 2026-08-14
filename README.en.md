@@ -2,14 +2,17 @@
 
 [简体中文](./README.md) | English
 
-Turn a question-and-answer exchange in DSH into a PNG image. Copy it to the clipboard or download it.
+Turn one DSH Q&A or selected Q&A groups into a PNG image, or download them as Markdown.
 
 ![dsh-share dialog preview](./assets/readme/share-dialog.webp)
 
 ## Features
 
-- Adds a share button to the end of each assistant response
-- Copies or downloads the conversation as a PNG image
+- Enters Q&A selection from the top-right action, with all groups selected by default
+- The share action below any turn opens the same selection mode with only that Q&A preselected
+- Shows linked checkboxes beside both the question and answer, lets you click content to select a group, and supports non-contiguous selection
+- Keeps a checkbox visible while scrolling through long content, then lets it leave at that question or answer's boundary
+- Supports image copy, PNG download, and Markdown download
 - Preserves Markdown, code blocks, tables, images, and tool call summaries
 - Supports adjustable image widths and font sizes, with a scrollable preview for long images
 - Can hide reasoning and tool calls, leaving only the question and final answer
@@ -76,7 +79,9 @@ The tarball includes the browser bundle, so installation does not need to run th
 
 This version targets npm `@deepseek-ai/dsh@0.1.0-rc.6` and declares DSH peers as `^0.1.0-rc.6`. Local development pins the exact rc.6 type packages, while the Web Profile still provides the shared runtime at deployment.
 
-The share button is mounted through the official `conversation.chat.assistant-actions` slot and is checked against the official Client types. It does not scan or modify the action bar DOM. Image generation reads the rendered `data-*` nodes for the current turn, so changes to DSH's conversation content structure may require an update to this plugin.
+The single-turn entry is mounted through the official `conversation.chat.assistant-actions` slot, while the conversation entry uses `conversation.session.header.utilities`. Both are checked against the official Client types and do not scan or modify the action bar DOM.
+
+DSH does not currently expose an additive slot for decorating the left side of a Q&A. Only while selection mode is active, the plugin uses a `MutationObserver` and the official page's stable `data-conversation-scroll`, `data-chat-flow-kind`, and `data-turn-tail` attributes to add linked, sticky checkboxes beside the rendered question and answer. It does not depend on CSS Module class names. Links, disclosure controls, and other content interactions are temporarily disabled in selection mode, so clicking a question or answer toggles its whole group; normal interaction returns after exiting. Changes to those data attributes or the conversation structure may require a plugin update.
 
 ## Development
 
@@ -102,6 +107,7 @@ DSH loads the files in `lib/` directly, so they must be committed with the sourc
 - Copying an image requires the browser Clipboard API. You can still download the PNG if clipboard permission is unavailable.
 - Remote resources in the image must allow browser access. An unreadable resource is replaced with a transparent placeholder without stopping the rest of the image from rendering.
 - Other chat apps may scale down very tall images. The plugin dialog only provides a clear, scrollable preview.
+- Q&A group selection covers completed turns already loaded by the page. Scroll upward first when older history is needed.
 
 ## License
 
