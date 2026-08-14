@@ -96,6 +96,10 @@ function packTo(directory) {
   ], {
     cwd: root,
     encoding: 'utf8',
+    env: {
+      ...process.env,
+      npm_config_cache: join(directory, 'npm-cache'),
+    },
     stdio: ['ignore', 'pipe', 'pipe'],
   })
   if (result.error) fail(`无法执行 npm pack：${result.error.message}`)
