@@ -1,9 +1,8 @@
 {
-  "name": "@dsh-external/dsh-share",
-  "version": "0.1.0",
-  "private": true,
+  "name": "dsh-share",
+  "version": "0.2.0",
   "description": "Share DSH Q&As or selected conversation groups as PNG or Markdown.",
-  "author": "digua <i@digua.me>",
+  "author": "hellodigua",
   "keywords": [
     "deepseek-harness",
     "dsh",
@@ -23,6 +22,7 @@
   "main": "lib/index.js",
   "types": "lib/types/index.d.ts",
   "files": [
+    "assets/readme",
     "lib",
     "cordis.patch.yml",
     "LICENSE",
@@ -44,6 +44,8 @@
   "scripts": {
     "build": "pnpm run clean && tsdown && tsc -p tsconfig.json",
     "clean": "node scripts/clean.mjs",
+    "prepack": "pnpm run build",
+    "release:check": "pnpm run verify && node scripts/check-package.mjs && git diff --check",
     "test": "vitest run",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "verify": "pnpm typecheck && pnpm test && pnpm build"
@@ -88,5 +90,9 @@
     "node": "^22.19.0 || >=24.0.0"
   },
   "packageManager": "pnpm@11.7.0",
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
   "license": "MIT"
 }

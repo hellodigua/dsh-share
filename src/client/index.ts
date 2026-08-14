@@ -25,7 +25,7 @@ import {
   type WidthPreset,
 } from './settings.ts'
 
-export const name = '@dsh-external/dsh-share/client'
+export const name = 'dsh-share/client'
 export const inject = ['slots']
 
 const STYLE_ID = 'dsh-share-style'

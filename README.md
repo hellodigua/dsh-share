@@ -19,19 +19,25 @@ DSH 对话分享插件，分享单轮或多轮对话，可导出为图片或 Mar
 
 默认使用“平板 + 标准字号”，设置会自动保存在浏览器中。
 
-## 安装
+## 快速安装
 
-### 从 GitHub tag 安装
-
-建议固定版本，避免仓库后续更新改变已经安装的代码：
+使用 DSH CLI 把插件加入 Web Profile，然后重启 `dsh web`：
 
 ```sh
-dsh plugin --profile web add \
-  --ignore-scripts --config.auto-install-peers=false \
-  'github:hellodigua/dsh-share#v0.1.0'
+dsh plugin --profile web add dsh-share
 ```
 
-安装完成后重启 `dsh web`。
+如需固定当前版本，使用 `dsh-share@0.2.0`。普通 `npm install dsh-share` 只会把包加入当前 Node.js 项目，不会启用 DSH 插件。
+
+## 其他安装方式
+
+### 从 GitHub 安装
+
+```sh
+dsh plugin --profile web add github:hellodigua/dsh-share#v0.2.0
+```
+
+仓库已经提交 `lib/` 构建产物，安装时无需在本机编译。
 
 ### 从本地 checkout 安装
 
@@ -39,9 +45,7 @@ dsh plugin --profile web add \
 git clone https://github.com/hellodigua/dsh-share.git
 cd dsh-share
 
-dsh plugin --profile web add \
-  --ignore-scripts --config.auto-install-peers=false \
-  .
+dsh plugin --profile web add .
 ```
 
 修改源码后先运行 `corepack pnpm build`，再强制刷新 profile 中的本地包：
@@ -49,9 +53,7 @@ dsh plugin --profile web add \
 ```sh
 corepack pnpm build
 
-dsh plugin --profile web add --force \
-  --ignore-scripts --config.auto-install-peers=false \
-  .
+dsh plugin --profile web add --force .
 ```
 
 ### 从 `local-plugins` tarball 安装
@@ -69,8 +71,7 @@ corepack pnpm pack --pack-destination ../local-plugins
 
 ```sh
 dsh plugin --profile web add \
-  --ignore-scripts --config.auto-install-peers=false \
-  /absolute/path/to/local-plugins/dsh-external-dsh-share-0.1.0.tgz
+  /absolute/path/to/local-plugins/dsh-share-0.2.0.tgz
 ```
 
 tarball 已包含浏览器构建产物，安装时不需要执行第三方构建脚本。
@@ -101,6 +102,8 @@ corepack pnpm verify
 ```
 
 `lib/` 是 DSH 直接加载的交付物，需要和源码一起提交。修改 `src/` 后，请重新构建并确认 `lib/` 已同步更新。
+
+发布前使用 `corepack pnpm release:check` 校验 npm 包边界，GitHub → npm 的自动化约定见 [RELEASING.md](https://github.com/hellodigua/dsh-share/blob/main/RELEASING.md)。
 
 ## 已知限制
 

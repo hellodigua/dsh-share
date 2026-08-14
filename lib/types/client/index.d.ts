@@ -1,7 +1,7 @@
 import type { ClientContext, ObservableSnapshot } from '@deepseek-ai/dsh-client-runtime/client';
 import type { InjectFace, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots';
 import { type ReactElement } from 'react';
-export declare const name = "@dsh-external/dsh-share/client";
+export declare const name = "dsh-share/client";
 export declare const inject: string[];
 export type ImageRenderer = (element: HTMLElement) => Promise<Blob>;
 export interface InstallOptions {
