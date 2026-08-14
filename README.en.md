@@ -2,7 +2,7 @@
 
 [简体中文](./README.md) | English
 
-Turn one DSH Q&A or selected Q&A groups into a PNG image, or download them as Markdown.
+Share DSH Q&As or selected conversation groups as PNG or Markdown.
 
 ![dsh-share dialog preview](./assets/readme/share-dialog.webp)
 

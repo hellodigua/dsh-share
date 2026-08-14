@@ -19,9 +19,32 @@ function normalizeText(text: string | null): string {
   return text?.replace(/\s+/g, ' ').trim() ?? ''
 }
 
+/** 把摘要行里的交互控件转为静态元素，同时保留当前运行时的 class 和图标。 */
+function makeToolSummaryStatic(row: HTMLElement): void {
+  for (const button of row.querySelectorAll<HTMLButtonElement>('button')) {
+    const replacement = row.ownerDocument.createElement('span')
+    for (const attribute of button.attributes) {
+      if (attribute.name === 'class' || attribute.name === 'style' || attribute.name.startsWith('data-')) {
+        replacement.setAttribute(attribute.name, attribute.value)
+      }
+    }
+    replacement.append(...button.childNodes)
+    button.replaceWith(replacement)
+  }
+  for (const control of row.querySelectorAll('input, textarea, select, [role="tooltip"]')) {
+    control.remove()
+  }
+  for (const element of [row, ...row.querySelectorAll<HTMLElement>('*')]) {
+    element.removeAttribute('aria-expanded')
+    element.removeAttribute('data-expandable')
+    element.removeAttribute('role')
+    element.removeAttribute('tabindex')
+  }
+}
+
 /**
- * 工具卡片内部包含展开面板、终端和交互控件，直接克隆既容易过长，也可能影响图片生成。
- * 这里只提取当前 DSH 稳定暴露的摘要行，再用插件自己的轻量结构绘制。
+ * 工具卡片内部可能包含展开面板和终端输出；这里只克隆原生折叠摘要行。
+ * 摘要的运行时 class、图标和内容结构会被保留，不依赖写死的 CSS Module 类名。
  */
 function cloneToolCallSummary(
   source: HTMLElement,
@@ -35,23 +58,10 @@ function cloneToolCallSummary(
   )
 
   for (const summary of summaryRows) {
-    const parts = [...summary.children]
-      .map((child) => normalizeText(child.textContent))
-      .filter(Boolean)
-    const text = parts.length > 0 ? parts.join(' · ') : normalizeText(summary.textContent)
-    if (!text) continue
-
-    const row = source.ownerDocument.createElement('div')
+    if (!normalizeText(summary.textContent)) continue
+    const row = summary.cloneNode(true) as HTMLElement
     row.dataset.dshShareToolSummary = ''
-    row.textContent = text
-    applyStyles(row, {
-      background: 'var(--dsw-alias-bg-elevated, rgba(127, 127, 127, 0.08))',
-      border: '1px solid var(--dsw-alias-line-border, rgba(127, 127, 127, 0.18))',
-      borderRadius: '8px',
-      color: 'var(--dsw-alias-label-secondary, #4b5563)',
-      margin: '8px 0',
-      padding: '9px 12px',
-    })
+    makeToolSummaryStatic(row)
     clone.append(row)
   }
 

@@ -52,7 +52,10 @@ describe('分享图片卡片', () => {
         <div data-variant="read" data-open>
           <div>
             <div data-disclosure-row data-expandable role="button" tabindex="0" aria-expanded="true">
-              <span>Read</span><button class="file-link">src/main.ts</button>
+              <span class="leading"><svg data-icon></svg></span>
+              <span class="title">Read</span>
+              <span class="separator"></span>
+              <button class="file-link">src/main.ts</button>
             </div>
             <div><p>不应出现在分享图中的完整文件内容</p><button>Inspect</button></div>
           </div>
@@ -70,7 +73,13 @@ describe('分享图片卡片', () => {
     expect(card.element.textContent).not.toContain('Inspect')
     expect(card.element.querySelector('button')).toBeNull()
     expect(card.element.querySelector('[data-open]')).toBeNull()
-    expect(card.element.querySelector('[data-dsh-share-tool-call]')).not.toBeNull()
+    const summary = card.element.querySelector<HTMLElement>('[data-dsh-share-tool-summary]')
+    expect(summary).not.toBeNull()
+    expect(summary?.hasAttribute('data-disclosure-row')).toBe(true)
+    expect(summary?.hasAttribute('data-expandable')).toBe(false)
+    expect(summary?.hasAttribute('role')).toBe(false)
+    expect(summary?.querySelector('[data-icon]')).not.toBeNull()
+    expect(summary?.querySelector('span.file-link')?.textContent).toBe('src/main.ts')
     card.dispose()
   })
 
@@ -82,8 +91,9 @@ describe('分享图片卡片', () => {
     toolCall.innerHTML = `
       <div data-chat-call-id="call-2">
         <div class="bash-card">
-          <div data-sample="bash" data-variant="bash" data-expandable role="button" aria-expanded="true">
-            <span>Bash</span><span>List project files</span>
+          <div class="native-bash-row" data-sample="bash" data-variant="bash" data-expandable role="button" aria-expanded="true">
+            <span class="leading"><svg data-icon></svg></span>
+            <span class="title">Bash</span><span class="summary">List project files</span>
           </div>
           <div data-terminal><pre>secret terminal output</pre><button>Inspect</button></div>
         </div>
@@ -97,6 +107,10 @@ describe('分享图片卡片', () => {
     expect(card.element.textContent).toContain('List project files')
     expect(card.element.textContent).not.toContain('secret terminal output')
     expect(card.element.textContent).not.toContain('Inspect')
+    const summary = card.element.querySelector<HTMLElement>('[data-dsh-share-tool-summary]')
+    expect(summary?.className).toBe('native-bash-row')
+    expect(summary?.querySelector('[data-icon]')).not.toBeNull()
+    expect(summary?.hasAttribute('aria-expanded')).toBe(false)
     card.dispose()
   })
 

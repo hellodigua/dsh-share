@@ -2,7 +2,7 @@
 
 简体中文 | [English](./README.en.md)
 
-把 DSH 中的一轮问答或选中的多组问答生成 PNG 图片，也可以下载为 Markdown。
+DSH 对话分享插件，分享单轮或多轮对话，可导出为图片或 Markdown。
 
 ![dsh-share 分享图片预览](./assets/readme/share-dialog.webp)
 
