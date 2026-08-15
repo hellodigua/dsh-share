@@ -162,8 +162,10 @@ describe('分享按钮运行时', () => {
     const fixture = createConversation()
     addTurn(fixture, 'one', 1)
     const disposeRegistration = vi.fn()
+    const disposeLocale = vi.fn()
     const injectionDisposers: Array<() => void> = []
     const register = vi.fn(() => disposeRegistration)
+    const subscribeLocale = vi.fn(() => disposeLocale)
     const injectSlot = vi.fn((_name: string, callback: () => void | (() => void)) => {
       const dispose = callback()
       if (dispose) injectionDisposers.push(dispose)
@@ -174,7 +176,7 @@ describe('分享按钮运行时', () => {
       locale: {
         getLocale: () => localeSnapshot,
         getSnapshot: () => localeSnapshot,
-        subscribe: () => () => undefined,
+        subscribe: subscribeLocale,
       },
       slots: { inject: injectSlot, register },
     } as never)
@@ -216,6 +218,7 @@ describe('分享按钮运行时', () => {
       order: -10,
     })
     expect(headerOptions.inject('session-one').shareRuntime).toBe(runtime)
+    expect(subscribeLocale).toHaveBeenCalledOnce()
 
     const action = actionComponent(actionProps(runtime, 'message-one'))
     expect(action.type).toBe(Tooltip)
@@ -249,6 +252,7 @@ describe('分享按钮运行时', () => {
 
     for (const dispose of injectionDisposers) dispose()
     expect(disposeRegistration).toHaveBeenCalledTimes(2)
+    expect(disposeLocale).toHaveBeenCalledOnce()
     expect(document.querySelector('[data-dsh-share-dialog]')).toBeNull()
     expect(document.getElementById('dsh-share-style')).toBeNull()
   })
@@ -276,6 +280,45 @@ describe('分享按钮运行时', () => {
     expect(document.querySelector('[data-dsh-share-choice][data-value="phone"]')?.textContent).toBe('手机')
 
     runtime.dispose()
+  })
+
+  it('选择模式打开时跟随 DSH 语言刷新完整操作栏', () => {
+    const fixture = createConversation()
+    addTurn(fixture, 'one', 1)
+    let locale: 'zh' | 'en' = 'zh'
+    let notifyLocale = (): void => undefined
+    const disposeLocale = vi.fn()
+    const runtime = createShareRuntime(document, {
+      getLocale: () => locale,
+      subscribeLocale: (listener) => {
+        notifyLocale = listener
+        return disposeLocale
+      },
+    })
+    clickHeaderShare(runtime, fixture.source)
+
+    locale = 'en'
+    notifyLocale()
+
+    const footer = fixture.scroll.querySelector('[data-dsh-share-selection-footer]') as HTMLElement
+    const selectAll = footer.querySelector<HTMLButtonElement>('[data-dsh-share-select-all]')
+    const cancel = footer.querySelector<HTMLButtonElement>('[data-dsh-share-selection-cancel]')
+    const markdown = footer.querySelector<HTMLButtonElement>('[data-dsh-share-selection-markdown]')
+    const create = footer.querySelector<HTMLButtonElement>('[data-dsh-share-selection-create]')
+    expect(selectAll?.ariaLabel).toBe('Select all')
+    expect(selectAll?.textContent).toBe('Select all')
+    expect(footer.querySelector('[data-dsh-share-selection-count]')?.textContent)
+      .toBe('1 conversation group selected')
+    expect(cancel?.textContent).toBe('Cancel')
+    expect(markdown?.ariaLabel).toBe('Download Markdown')
+    expect(markdown?.querySelector('[data-dsh-share-label="compact"]')?.textContent).toBe('Markdown')
+    expect(create?.ariaLabel).toBe('Create image')
+    expect(create?.querySelector('[data-dsh-share-label="wide"]')?.textContent).toBe('Create image')
+    expect([...fixture.scroll.querySelectorAll<HTMLButtonElement>('[data-dsh-share-turn-select]')]
+      .every(button => button.ariaLabel === 'Unselect this conversation group')).toBe(true)
+
+    runtime.dispose()
+    expect(disposeLocale).toHaveBeenCalledOnce()
   })
 
   it('运行时重复释放不会报错', () => {

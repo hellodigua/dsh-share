@@ -497,6 +497,7 @@ type ShareLocale = 'zh' | 'en'
 export interface InstallOptions {
   getLocale?: () => ShareLocale
   renderImage?: ImageRenderer
+  subscribeLocale?: (listener: () => void) => () => void
 }
 
 interface RenderRequest {
@@ -1133,6 +1134,18 @@ function appendResponsiveLabel(
   button.append(wideLabel, compactLabel)
 }
 
+function updateResponsiveLabel(
+  button: HTMLButtonElement,
+  wide: string,
+  compact: string,
+): void {
+  if (button.ariaLabel !== wide) button.ariaLabel = wide
+  const wideLabel = button.querySelector<HTMLElement>('[data-dsh-share-label="wide"]')
+  const compactLabel = button.querySelector<HTMLElement>('[data-dsh-share-label="compact"]')
+  if (wideLabel && wideLabel.textContent !== wide) wideLabel.textContent = wide
+  if (compactLabel && compactLabel.textContent !== compact) compactLabel.textContent = compact
+}
+
 export function createShareRuntime(document: Document, options: InstallOptions = {}): ShareRuntime {
   const style = document.createElement('style')
   style.id = STYLE_ID
@@ -1192,15 +1205,8 @@ export function createShareRuntime(document: Document, options: InstallOptions =
     return controller
   }
 
-  const publishSelection = (controller: SessionSelection, active: boolean): void => {
-    const total = controller.available.size
-    controller.snapshot = {
-      active,
-      allSelected: total > 0 && controller.selected.size === total,
-      count: controller.selected.size,
-      selectedIds: new Set(controller.selected.keys()),
-      total,
-    }
+  const refreshSelectionCopy = (controller: SessionSelection): void => {
+    const strings = t(currentLocale())
     if (controller.scroll) {
       for (const button of controller.scroll.querySelectorAll<HTMLButtonElement>(
         '[data-dsh-share-turn-select]',
@@ -1212,20 +1218,50 @@ export function createShareRuntime(document: Document, options: InstallOptions =
       }
     }
     if (controller.footer) {
-      const strings = t(currentLocale())
       const all = controller.footer.querySelector<HTMLButtonElement>('[data-dsh-share-select-all]')
+      const allLabel = controller.footer.querySelector<HTMLElement>('[data-dsh-share-select-all-label]')
       const count = controller.footer.querySelector<HTMLElement>('[data-dsh-share-selection-count]')
+      const cancel = controller.footer.querySelector<HTMLButtonElement>('[data-dsh-share-selection-cancel]')
       const markdown = controller.footer.querySelector<HTMLButtonElement>('[data-dsh-share-selection-markdown]')
       const create = controller.footer.querySelector<HTMLButtonElement>('[data-dsh-share-selection-create]')
-      all?.setAttribute('aria-checked', String(controller.snapshot.allSelected))
+      if (all) {
+        all.setAttribute('aria-checked', String(controller.snapshot.allSelected))
+        if (all.ariaLabel !== strings.selectAll) all.ariaLabel = strings.selectAll
+      }
+      if (allLabel && allLabel.textContent !== strings.selectAll) allLabel.textContent = strings.selectAll
       const nextCount = strings.selectedCount(controller.selected.size)
       // footer 位于被观察的会话区域内；仅在文案变化时写入，避免自身触发 MutationObserver 循环。
       if (count && count.textContent !== nextCount) count.textContent = nextCount
+      if (cancel && cancel.textContent !== strings.cancelSelection) cancel.textContent = strings.cancelSelection
+      if (markdown) {
+        updateResponsiveLabel(markdown, strings.downloadMarkdown, strings.downloadMarkdownCompact)
+      }
+      if (create) {
+        updateResponsiveLabel(create, strings.createSelection, strings.createSelectionCompact)
+      }
       if (markdown) markdown.disabled = controller.selected.size === 0
       if (create) create.disabled = controller.selected.size === 0
     }
+  }
+
+  const publishSelection = (controller: SessionSelection, active: boolean): void => {
+    const total = controller.available.size
+    controller.snapshot = {
+      active,
+      allSelected: total > 0 && controller.selected.size === total,
+      count: controller.selected.size,
+      selectedIds: new Set(controller.selected.keys()),
+      total,
+    }
+    refreshSelectionCopy(controller)
     for (const listener of controller.listeners) listener()
   }
+
+  const unsubscribeLocale = options.subscribeLocale?.(() => {
+    for (const controller of selections.values()) {
+      if (controller.snapshot.active) refreshSelectionCopy(controller)
+    }
+  })
 
   const cleanupSelectionDom = (controller: SessionSelection): void => {
     const scroll = controller.scroll
@@ -1437,6 +1473,7 @@ export function createShareRuntime(document: Document, options: InstallOptions =
     const selectAllBox = document.createElement('span')
     selectAllBox.dataset.dshShareSelectAllBox = ''
     const selectAllLabel = document.createElement('span')
+    selectAllLabel.dataset.dshShareSelectAllLabel = ''
     selectAllLabel.textContent = strings.selectAll
     selectAll.append(selectAllBox, selectAllLabel)
     selectAll.addEventListener('click', () => toggleAll(controller))
@@ -1667,6 +1704,7 @@ export function createShareRuntime(document: Document, options: InstallOptions =
         controller.snapshots.clear()
       }
       selections.clear()
+      unsubscribeLocale?.()
       style.remove()
       dialog.destroy()
     },
@@ -1747,6 +1785,7 @@ export function apply(ctx: ClientContext): void {
   const runtimeForRegistration = (): ShareRuntime => {
     sharedRuntime ??= createShareRuntime(document, {
       getLocale: () => ctx.locale.getLocale().active,
+      subscribeLocale: listener => ctx.locale.subscribe(listener),
     })
     return sharedRuntime
   }

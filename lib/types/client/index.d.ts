@@ -9,6 +9,7 @@ type ShareLocale = 'zh' | 'en';
 export interface InstallOptions {
     getLocale?: () => ShareLocale;
     renderImage?: ImageRenderer;
+    subscribeLocale?: (listener: () => void) => () => void;
 }
 export declare function renderShareImage(element: HTMLElement): Promise<Blob>;
 export interface ShareSelectionSnapshot {
