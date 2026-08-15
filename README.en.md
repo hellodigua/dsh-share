@@ -23,7 +23,7 @@ Adjust the image width, font size, and process visibility before downloading or 
 - Supports adjustable image widths and font sizes, with a scrollable preview for long images
 - Can hide reasoning and tool calls, leaving only the question and final answer
 
-Performance testing: No impact on everyday chat by default. Runs on demand when sharing and is optimized for multi-turn conversations.
+Performance testing: Everyday chat keeps only the lightweight share actions. Selection processing and image generation start only when sharing, with optimizations for multi-turn conversations.
 
 ## Quick installation
 
