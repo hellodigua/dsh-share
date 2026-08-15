@@ -20,9 +20,9 @@ CI 在 `main` push 和 pull request 上执行同一检查，并额外要求构�
 
 1. checkout 使用完整 Git 历史，Node 使用项目 `engines` 支持的版本。
 2. job 只授予 `contents: write` 与 `id-token: write`；npm 通过 Trusted Publisher 的 OIDC 身份发布，不保存长期 npm token。
-3. 使用 frozen lockfile 安装依赖，执行 `pnpm release:check`，并确认 tag 中的版本与 `package.json` 完全一致。
-4. 使用 `npm publish --provenance` 发布 npm 包。`prepack` 会在发布前重新生成 `lib/`。
-5. npm 发布成功后创建 GitHub Release，并可附加由同一提交生成的 tarball。
+3. 只发布 `main` 历史上的提交；使用 frozen lockfile 安装依赖，执行 `pnpm release:check`，并确认 tag 中的版本与 `package.json` 完全一致。
+4. 校验通过后生成一次 tarball，使用 `npm publish <tarball> --provenance` 发布，并把同一文件附加到 GitHub Release，保证两处产物一致。
+5. npm 发布成功后创建 GitHub Release。
 
 npm Trusted Publisher 应绑定仓库 `hellodigua/dsh-share`、实际发布 workflow 文件名和 GitHub Environment（如果 workflow 使用）。这些值必须与 GitHub Actions 配置完全一致。
 
