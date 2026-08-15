@@ -1,5 +1,6 @@
 import { toBlob } from 'html-to-image'
 import type { ClientContext, ObservableSnapshot } from '@deepseek-ai/dsh-client-runtime/client'
+import type { LocaleSnapshot } from '@deepseek-ai/dsh-client-locale/client'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import { IconShareOutline16, Tooltip } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { InjectFace, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
@@ -26,7 +27,7 @@ import {
 } from './settings.ts'
 
 export const name = 'dsh-share/client'
-export const inject = ['slots']
+export const inject = ['slots', 'locale']
 
 const STYLE_ID = 'dsh-share-style'
 const TRANSPARENT_IMAGE_PLACEHOLDER =
@@ -491,8 +492,10 @@ const STYLE_TEXT = `
 `
 
 export type ImageRenderer = (element: HTMLElement) => Promise<Blob>
+type ShareLocale = 'zh' | 'en'
 
 export interface InstallOptions {
+  getLocale?: () => ShareLocale
   renderImage?: ImageRenderer
 }
 
@@ -540,12 +543,12 @@ interface Translation {
   xlarge: string
 }
 
-function getLocale(document: Document): 'zh' | 'en' {
+function getDocumentLocale(document: Document): ShareLocale {
   return document.documentElement.lang.toLowerCase().startsWith('zh') ? 'zh' : 'en'
 }
 
-function t(document: Document): Translation {
-  if (getLocale(document) === 'zh') {
+function t(locale: ShareLocale): Translation {
+  if (locale === 'zh') {
     return {
       title: '分享当前问答',
       selectedTitle: () => '生成图片',
@@ -646,6 +649,7 @@ function downloadMarkdownFile(document: Document, markdown: string): void {
 }
 
 interface PreviewDialogOptions {
+  getLocale(): ShareLocale
   onSettingsChange(settings: ShareSettings): void
   onDismiss(): void
 }
@@ -669,7 +673,7 @@ class PreviewDialog {
     private readonly document: Document,
     private readonly options: PreviewDialogOptions,
   ) {
-    const strings = t(document)
+    const strings = t(options.getLocale())
     let storage: Storage | undefined
     try {
       storage = document.defaultView?.localStorage
@@ -780,12 +784,46 @@ class PreviewDialog {
     return { ...this.currentSettings }
   }
 
+  /** 弹窗会跨语言切换复用；每次显示前都从 DSH 官方 locale 刷新静态文案。 */
+  private updateCopy(): Translation {
+    const strings = t(this.options.getLocale())
+    const widthGroup = this.element.querySelector<HTMLElement>('[data-dsh-share-width]')
+    const fontSizeGroup = this.element.querySelector<HTMLElement>('[data-dsh-share-font-size]')
+    const close = this.element.querySelector<HTMLButtonElement>('[data-dsh-share-close]')
+    const labels: Record<string, string> = {
+      phone: strings.phone,
+      tablet: strings.tablet,
+      desktop: strings.desktop,
+      normal: strings.normal,
+      large: strings.large,
+      xlarge: strings.xlarge,
+    }
+    const widthLabel = this.element.querySelector<HTMLElement>('[data-dsh-share-width-label]')
+    const fontSizeLabel = this.element.querySelector<HTMLElement>('[data-dsh-share-font-size-label]')
+    const hideProcessLabel = this.element.querySelector<HTMLElement>('[data-dsh-share-hide-process-label]')
+    if (widthLabel) widthLabel.textContent = strings.width
+    if (fontSizeLabel) fontSizeLabel.textContent = strings.fontSize
+    if (hideProcessLabel) hideProcessLabel.textContent = strings.hideProcess
+    if (widthGroup) widthGroup.ariaLabel = strings.width
+    if (fontSizeGroup) fontSizeGroup.ariaLabel = strings.fontSize
+    if (close) {
+      close.title = strings.close
+      close.ariaLabel = strings.close
+    }
+    for (const button of this.choiceButtons) {
+      button.textContent = labels[button.dataset.value ?? ''] ?? button.textContent
+    }
+    this.copyButton.textContent = strings.copy
+    this.downloadButton.textContent = strings.download
+    return strings
+  }
+
   showLoading(
     turnCount: number,
     preservePreview = false,
     selectionExport = false,
   ): void {
-    const strings = t(this.document)
+    const strings = this.updateCopy()
     const canPreserve = preservePreview && this.blob !== undefined && this.objectUrl !== undefined
     this.title.textContent = selectionExport ? strings.selectedTitle(turnCount) : strings.title
     this.element.ariaBusy = 'true'
@@ -810,7 +848,7 @@ class PreviewDialog {
 
   /** 设置连续变化时先保留当前预览，只更新轻量状态；图片稍后统一重算。 */
   showPendingUpdate(): void {
-    const strings = t(this.document)
+    const strings = this.updateCopy()
     const canPreserve = this.blob !== undefined && this.objectUrl !== undefined
     this.element.ariaBusy = 'true'
     this.copyButton.disabled = true
@@ -865,7 +903,7 @@ class PreviewDialog {
   }
 
   showError(preservePreview = false): void {
-    const strings = t(this.document)
+    const strings = t(this.options.getLocale())
     const canPreserve = preservePreview && this.blob !== undefined && this.objectUrl !== undefined
     this.element.ariaBusy = 'false'
     if (canPreserve) {
@@ -969,7 +1007,7 @@ class PreviewDialog {
 
   private async copy(): Promise<void> {
     if (!this.blob) return
-    const strings = t(this.document)
+    const strings = t(this.options.getLocale())
     const clipboard = this.document.defaultView?.navigator.clipboard
     const ClipboardItemConstructor = this.document.defaultView?.ClipboardItem
     if (!clipboard?.write || !ClipboardItemConstructor) {
@@ -1030,6 +1068,7 @@ interface SessionSelection extends ObservableSnapshot<ShareSelectionSnapshot> {
 
 export interface ShareRuntime {
   readonly document: Document
+  getLocale(): ShareLocale
   selectionFor(sessionId: string): ObservableSnapshot<ShareSelectionSnapshot>
   enterSelection(sessionId: string, source?: HTMLElement, initialTurn?: number): void
   cancelSelection(sessionId: string): void
@@ -1101,6 +1140,7 @@ export function createShareRuntime(document: Document, options: InstallOptions =
   document.head.append(style)
 
   const renderImage = options.renderImage ?? renderShareImage
+  const currentLocale = options.getLocale ?? (() => getDocumentLocale(document))
   let activeContent: readonly ShareMessage[] | undefined
   let activeGroupCount = 0
   let renderEpoch = 0
@@ -1168,11 +1208,11 @@ export function createShareRuntime(document: Document, options: InstallOptions =
         const id = button.dataset.turnId ?? ''
         const selected = controller.selected.has(id)
         button.setAttribute('aria-checked', String(selected))
-        button.ariaLabel = selected ? t(document).unselectTurn : t(document).selectTurn
+        button.ariaLabel = selected ? t(currentLocale()).unselectTurn : t(currentLocale()).selectTurn
       }
     }
     if (controller.footer) {
-      const strings = t(document)
+      const strings = t(currentLocale())
       const all = controller.footer.querySelector<HTMLButtonElement>('[data-dsh-share-select-all]')
       const count = controller.footer.querySelector<HTMLElement>('[data-dsh-share-selection-count]')
       const markdown = controller.footer.querySelector<HTMLButtonElement>('[data-dsh-share-selection-markdown]')
@@ -1385,7 +1425,7 @@ export function createShareRuntime(document: Document, options: InstallOptions =
   }
 
   const createSelectionFooter = (controller: SessionSelection): HTMLElement => {
-    const strings = t(document)
+    const strings = t(currentLocale())
     const footer = document.createElement('div')
     footer.dataset.dshShareSelectionFooter = ''
     const inner = document.createElement('div')
@@ -1420,7 +1460,7 @@ export function createShareRuntime(document: Document, options: InstallOptions =
     markdown.addEventListener('click', () => {
       const messages = selectedTurnsToShareMessages(controller.selected.values())
       if (messages.length === 0) return
-      downloadMarkdownFile(document, createShareMarkdown(messages, getLocale(document), dialog.settings))
+      downloadMarkdownFile(document, createShareMarkdown(messages, currentLocale(), dialog.settings))
     })
 
     const create = makeButton(document, 'dshShareSelectionCreate')
@@ -1455,7 +1495,7 @@ export function createShareRuntime(document: Document, options: InstallOptions =
     preservePreview = false,
     epoch = ++renderEpoch,
   ): RenderRequest => {
-    const locale = getLocale(document)
+    const locale = currentLocale()
     const settings = dialog.settings
     dialog.showLoading(groupCount, preservePreview, true)
     return { content, epoch, locale, preservePreview, settings }
@@ -1534,6 +1574,7 @@ export function createShareRuntime(document: Document, options: InstallOptions =
   }
 
   dialog = new PreviewDialog(document, {
+    getLocale: currentLocale,
     onSettingsChange: () => {
       if (activeContent) scheduleSettingsRender(activeContent, activeGroupCount)
     },
@@ -1597,6 +1638,7 @@ export function createShareRuntime(document: Document, options: InstallOptions =
   let disposed = false
   return {
     document,
+    getLocale: currentLocale,
     selectionFor,
     enterSelection,
     cancelSelection: (sessionId) => {
@@ -1632,7 +1674,10 @@ export function createShareRuntime(document: Document, options: InstallOptions =
 }
 
 interface ShareRuntimeInjected {
-  hooks: { shareSelection: ObservableSnapshot<ShareSelectionSnapshot> }
+  hooks: {
+    shareLocale: ObservableSnapshot<LocaleSnapshot>
+    shareSelection: ObservableSnapshot<ShareSelectionSnapshot>
+  }
   shareRuntime: ShareRuntime
 }
 
@@ -1646,9 +1691,9 @@ export type ShareConversationActionProps =
 
 /** 官方 assistant-actions 插槽中的分享入口。 */
 export function ShareAction({
-  messageId, sessionId, shareRuntime, useSession, useShareSelection,
+  messageId, sessionId, shareRuntime, useSession, useShareLocale, useShareSelection,
 }: ShareActionProps): ReactElement {
-  const strings = t(shareRuntime.document)
+  const strings = t(useShareLocale(snapshot => snapshot.active))
   const selection = useShareSelection(snapshot => snapshot)
   const turn = useSession((snapshot) => {
     for (const node of snapshot.chat.nodes.values()) {
@@ -1680,9 +1725,9 @@ export function ShareAction({
 
 /** 官方 Session Header 右侧 utilities 插槽中的多轮分享入口。 */
 export function ShareConversationAction({
-  sessionId, shareRuntime, useShareSelection,
+  sessionId, shareRuntime, useShareLocale, useShareSelection,
 }: ShareConversationActionProps): ReactElement {
-  const strings = t(shareRuntime.document)
+  const strings = t(useShareLocale(snapshot => snapshot.active))
   const selection = useShareSelection(snapshot => snapshot)
   if (selection.active) return createElement(Fragment)
   const button = createElement('button', {
@@ -1700,13 +1745,18 @@ export function apply(ctx: ClientContext): void {
   let sharedRuntime: ShareRuntime | undefined
   let registrations = 0
   const runtimeForRegistration = (): ShareRuntime => {
-    sharedRuntime ??= createShareRuntime(document)
+    sharedRuntime ??= createShareRuntime(document, {
+      getLocale: () => ctx.locale.getLocale().active,
+    })
     return sharedRuntime
   }
   const injectFace = (sessionId: unknown): ShareRuntimeInjected => {
     const runtime = runtimeForRegistration()
     return {
-      hooks: { shareSelection: runtime.selectionFor(String(sessionId)) },
+      hooks: {
+        shareLocale: ctx.locale,
+        shareSelection: runtime.selectionFor(String(sessionId)),
+      },
       shareRuntime: runtime,
     }
   }

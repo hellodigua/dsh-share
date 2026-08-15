@@ -79,10 +79,16 @@ function actionProps(
   sessionId = 'session-1',
 ): ShareActionProps {
   const selection = runtime.selectionFor(sessionId)
+  const locale = {
+    active: runtime.getLocale(),
+    locales: [],
+    revision: 0,
+  } as const
   return {
     messageId,
     sessionId,
     shareRuntime: runtime,
+    useShareLocale: selector => selector(locale),
     useShareSelection: selector => selector(selection.getSnapshot()),
     useSession: selector => selector({
       chat: {
@@ -99,9 +105,15 @@ function actionProps(
 
 function headerProps(runtime: ShareRuntime, sessionId = 'session-1'): ShareConversationActionProps {
   const selection = runtime.selectionFor(sessionId)
+  const locale = {
+    active: runtime.getLocale(),
+    locales: [],
+    revision: 0,
+  } as const
   return {
     sessionId,
     shareRuntime: runtime,
+    useShareLocale: selector => selector(locale),
     useShareSelection: selector => selector(selection.getSnapshot()),
   } as ShareConversationActionProps
 }
@@ -157,7 +169,15 @@ describe('分享按钮运行时', () => {
       if (dispose) injectionDisposers.push(dispose)
     })
 
-    apply({ slots: { inject: injectSlot, register } } as never)
+    const localeSnapshot = { active: 'zh', locales: [], revision: 0 } as const
+    apply({
+      locale: {
+        getLocale: () => localeSnapshot,
+        getSnapshot: () => localeSnapshot,
+        subscribe: () => () => undefined,
+      },
+      slots: { inject: injectSlot, register },
+    } as never)
 
     expect(injectSlot).toHaveBeenCalledWith('conversation.chat.assistant-actions', expect.any(Function))
     expect(injectSlot).toHaveBeenCalledWith('conversation.session.header.utilities', expect.any(Function))
@@ -233,15 +253,27 @@ describe('分享按钮运行时', () => {
     expect(document.getElementById('dsh-share-style')).toBeNull()
   })
 
-  it('英文界面的两个 Tooltip 使用英文文案', () => {
-    document.documentElement.lang = 'en'
-    const runtime = createShareRuntime(document)
+  it('使用 DSH 官方语言状态渲染英文，而不是依赖固定的 HTML lang', () => {
+    const fixture = createConversation()
+    const tail = addTurn(fixture, 'one', 1)
+    let locale: 'zh' | 'en' = 'en'
+    const runtime = createShareRuntime(document, {
+      getLocale: () => locale,
+      renderImage: vi.fn(async () => new Blob(['image'], { type: 'image/png' })),
+    })
     const action = ShareAction(actionProps(runtime, 'message-en'))
     const header = ShareConversationAction(headerProps(runtime))
 
     expect(action.props.label).toBe('Share')
     expect(action.props.children.props['aria-label']).toBe('Share this Q&A as an image')
     expect(header.props.label).toBe('Share conversation')
+    expect(document.querySelector('[data-dsh-share-close]')?.getAttribute('aria-label')).toBe('Close')
+
+    locale = 'zh'
+    triggerShareAction(tail, runtime)
+    document.querySelector<HTMLButtonElement>('[data-dsh-share-selection-create]')?.click()
+    expect(document.querySelector('[data-dsh-share-close]')?.getAttribute('aria-label')).toBe('关闭')
+    expect(document.querySelector('[data-dsh-share-choice][data-value="phone"]')?.textContent).toBe('手机')
 
     runtime.dispose()
   })
