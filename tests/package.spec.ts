@@ -42,6 +42,7 @@ describe('DSH 插件清单', () => {
     expect(packageJson.dsh.bundle.patch).toBe('./cordis.patch.yml')
     expect(packageJson.dsh.client.platform).toBe('web')
     expect(packageJson.dsh.client.inject).toEqual([
+      '@deepseek-ai/dsh-client-locale',
       '@deepseek-ai/dsh-client-runtime',
       '@deepseek-ai/dsh-client-ui-conversation',
       '@deepseek-ai/dsh-client-ui-primitives',
