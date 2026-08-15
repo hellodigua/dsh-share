@@ -4,7 +4,7 @@
 
 Share DSH Q&As or selected conversation groups as PNG or Markdown.
 
-Multi-select Q&As with an interaction consistent with DeepSeek's web app, then download the selection as Markdown.
+Multi-select Q&As with the same interaction and experience as the DeepSeek web app.
 
 ![dsh-share multi-turn Q&A selection](./assets/readme/share-selection.en.webp)
 
@@ -23,7 +23,7 @@ Adjust the image width, font size, and process visibility before downloading or 
 - Supports adjustable image widths and font sizes, with a scrollable preview for long images
 - Can hide reasoning and tool calls, leaving only the question and final answer
 
-The default is Tablet width with Standard font size. Your preferences are saved in the browser.
+Performance testing: No impact on everyday chat by default. Runs on demand when sharing and is optimized for multi-turn conversations.
 
 ## Quick installation
 
@@ -35,58 +35,19 @@ dsh plugin --profile web add dsh-share
 
 ## Other installation methods
 
-### From GitHub
+Install a specific GitHub version:
 
 ```sh
 dsh plugin --profile web add github:hellodigua/dsh-share#vX.Y.Z
 ```
 
-The repository includes the built `lib/` output, so installation does not require a local build.
-
-### From a local checkout
+Install from a local checkout:
 
 ```sh
-git clone https://github.com/hellodigua/dsh-share.git
-cd dsh-share
-
-dsh plugin --profile web add .
+dsh plugin --profile web add /absolute/path/to/dsh-share
 ```
 
-After changing the source code, build it and force-refresh the local package in the profile:
-
-```sh
-corepack pnpm build
-
-dsh plugin --profile web add --force .
-```
-
-### From a `local-plugins` tarball
-
-The repository includes a prebuilt `lib/` directory. You can also package it like the other plugins in DSH's `local-plugins` directory:
-
-```sh
-corepack pnpm install --frozen-lockfile
-corepack pnpm verify
-mkdir -p ../local-plugins
-corepack pnpm pack --pack-destination ../local-plugins
-```
-
-Then install the generated file:
-
-```sh
-dsh plugin --profile web add \
-  /absolute/path/to/local-plugins/dsh-share-X.Y.Z.tgz
-```
-
-The tarball includes the browser bundle, so installation does not need to run third-party build scripts.
-
-## Compatibility
-
-This version targets npm `@deepseek-ai/dsh@0.1.0-rc.6` and declares DSH peers as `^0.1.0-rc.6`. Local development pins the exact rc.6 type packages, while the Web Profile still provides the shared runtime at deployment.
-
-The single-turn entry is mounted through the official `conversation.chat.assistant-actions` slot, while the conversation entry uses `conversation.session.header.utilities`. Both are checked against the official Client types and do not scan or modify the action bar DOM.
-
-DSH does not currently expose an additive slot for decorating the left side of a Q&A. Only while selection mode is active, the plugin uses a `MutationObserver` and the official page's stable `data-conversation-scroll`, `data-chat-flow-kind`, and `data-turn-tail` attributes to add linked, sticky checkboxes beside the rendered question and answer. It does not depend on CSS Module class names. Links, disclosure controls, and other content interactions are temporarily disabled in selection mode, so clicking a question or answer toggles its whole group; normal interaction returns after exiting. Changes to those data attributes or the conversation structure may require a plugin update.
+After changing the source, run `corepack pnpm build`, then refresh the plugin with `dsh plugin --profile web add --force /absolute/path/to/dsh-share`.
 
 ## Development
 
@@ -109,12 +70,15 @@ DSH loads the files in `lib/` directly, so they must be committed with the sourc
 
 Run `corepack pnpm release:check` before a release. See [RELEASING.md](https://github.com/hellodigua/dsh-share/blob/main/RELEASING.md) for the GitHub-to-npm automation contract.
 
+## Compatibility
+
+Compatible with `@deepseek-ai/dsh ^0.1.0-rc.6`. Share actions use the official `conversation.chat.assistant-actions` and `conversation.session.header.utilities` slots, and do not scan or modify the action bar DOM. Selection mode adds checkboxes through `data-chat-flow-kind` and other stable `data-*` attributes, and does not depend on CSS Module class names; changes to the conversation structure may require a plugin update.
+
 ## Known limitations
 
-- Copying an image requires the browser Clipboard API. You can still download the PNG if clipboard permission is unavailable.
-- Remote resources in the image must allow browser access. An unreadable resource is replaced with a transparent placeholder without stopping the rest of the image from rendering.
-- Other chat apps may scale down very tall images. The plugin dialog only provides a clear, scrollable preview.
-- Q&A group selection covers completed turns already loaded by the page. Scroll upward first when older history is needed.
+- Copying an image requires clipboard permission. You can still download it if permission is unavailable.
+- Unreadable remote resources are replaced with transparent placeholders.
+- Only fully loaded Q&As can be selected. Scroll upward first to load older content.
 
 ## License
 
