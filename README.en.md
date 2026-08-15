@@ -4,7 +4,13 @@
 
 Share DSH Q&As or selected conversation groups as PNG or Markdown.
 
-![dsh-share dialog preview](./assets/readme/share-dialog.webp)
+Multi-select Q&As with an interaction consistent with DeepSeek's web app, then download the selection as Markdown.
+
+![dsh-share multi-turn Q&A selection](./assets/readme/share-selection.en.webp)
+
+Adjust the image width, font size, and process visibility before downloading or copying the result.
+
+![dsh-share image generation](./assets/readme/share-dialog.en.webp)
 
 ## Features
 
@@ -26,8 +32,6 @@ Add the plugin to the Web Profile with the DSH CLI, then restart `dsh web`:
 ```sh
 dsh plugin --profile web add dsh-share
 ```
-
-To try a prerelease, replace the package name in the installation command with `dsh-share@beta`. A plain `npm install dsh-share` only adds the package to the current Node.js project; it does not enable the DSH plugin.
 
 ## Other installation methods
 

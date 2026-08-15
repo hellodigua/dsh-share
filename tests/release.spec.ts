@@ -42,7 +42,8 @@ function packReport(overrides: Record<string, unknown> = {}) {
     'package.json', 'lib/index.js', 'lib/client.js', 'lib/types/index.d.ts',
     'lib/types/client/index.d.ts', 'cordis.patch.yml', 'README.md',
     'README.en.md', 'CHANGELOG.md', 'LICENSE', 'THIRD_PARTY_LICENSES.md',
-    'assets/readme/share-dialog.webp',
+    'assets/readme/share-selection.webp', 'assets/readme/share-selection.en.webp',
+    'assets/readme/share-dialog.webp', 'assets/readme/share-dialog.en.webp',
   ].map(path => ({ mode: 0o644, path, size: 1 }))
   return JSON.stringify([{
     filename: `dsh-share-${FIXTURE_VERSION}.tgz`,

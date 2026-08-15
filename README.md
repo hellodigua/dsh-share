@@ -4,7 +4,13 @@
 
 DSH 对话分享插件，分享单轮或多轮对话，可导出为图片或 Markdown。
 
-![dsh-share 分享图片预览](./assets/readme/share-dialog.webp)
+和 DeepSeek 网页端一致的多选交互，同时支持将所选问答下载为 Markdown。
+
+![dsh-share 多轮问答选择](./assets/readme/share-selection.webp)
+
+生成图片前可调整宽度、字号和过程显示，完成后可下载或复制图片。
+
+![dsh-share 生成图片](./assets/readme/share-dialog.webp)
 
 ## 功能
 
@@ -26,8 +32,6 @@ DSH 对话分享插件，分享单轮或多轮对话，可导出为图片或 Mar
 ```sh
 dsh plugin --profile web add dsh-share
 ```
-
-如需体验预发布版本，将安装命令中的包名替换为 `dsh-share@beta`。普通 `npm install dsh-share` 只会把包加入当前 Node.js 项目，不会启用 DSH 插件。
 
 ## 其他安装方式
 
