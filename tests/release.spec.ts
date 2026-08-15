@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -53,6 +53,24 @@ function packReport(overrides: Record<string, unknown> = {}) {
 }
 
 describe('npm 发布边界', () => {
+  it('由版本 tag 自动发布 npm 包并创建 GitHub Release', () => {
+    const workflow = readFileSync(
+      new URL('../.github/workflows/release.yml', import.meta.url),
+      'utf8',
+    )
+
+    expect(workflow).toMatch(/push:\n\s+tags:\n\s+- 'v\*'/)
+    expect(workflow).toContain('contents: write')
+    expect(workflow).toContain('id-token: write')
+    expect(workflow).toContain('pnpm install --frozen-lockfile')
+    expect(workflow).toContain('pnpm release:check')
+    expect(workflow).toContain('git diff --exit-code')
+    expect(workflow).toContain('GITHUB_REF_NAME#v')
+    expect(workflow).toContain('git merge-base --is-ancestor "$GITHUB_SHA" origin/main')
+    expect(workflow).toContain('npm publish "$TARBALL" --provenance --access public')
+    expect(workflow).toContain('gh release create "$GITHUB_REF_NAME" "$TARBALL"')
+  })
+
   it('接受公开的 dsh-share 稳定版 manifest', () => {
     expect(validatePackageManifest(manifest()).name).toBe('dsh-share')
     expect(() => validatePackageManifest(manifest({ private: true }))).toThrow('不能声明 private')
