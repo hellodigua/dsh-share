@@ -1160,7 +1160,7 @@ export function createShareRuntime(document: Document, options: InstallOptions =
   let pendingRender: RenderRequest | undefined
   let renderRunning = false
   let settingsRenderTimer: number | undefined
-  let dialog: PreviewDialog
+  let dialog: PreviewDialog | undefined
   const selections = new Map<string, SessionSelection>()
 
   const preserveScrollPosition = (scroll: HTMLElement, scrollTop: number): void => {
@@ -1257,11 +1257,20 @@ export function createShareRuntime(document: Document, options: InstallOptions =
     for (const listener of controller.listeners) listener()
   }
 
-  const unsubscribeLocale = options.subscribeLocale?.(() => {
-    for (const controller of selections.values()) {
-      if (controller.snapshot.active) refreshSelectionCopy(controller)
-    }
-  })
+  let unsubscribeLocale: (() => void) | undefined
+  const subscribeSelectionLocale = (): void => {
+    if (unsubscribeLocale || !options.subscribeLocale) return
+    unsubscribeLocale = options.subscribeLocale(() => {
+      for (const controller of selections.values()) {
+        if (controller.snapshot.active) refreshSelectionCopy(controller)
+      }
+    })
+  }
+  const unsubscribeSelectionLocaleIfIdle = (): void => {
+    if ([...selections.values()].some(controller => controller.snapshot.active)) return
+    unsubscribeLocale?.()
+    unsubscribeLocale = undefined
+  }
 
   const cleanupSelectionDom = (controller: SessionSelection): void => {
     const scroll = controller.scroll
@@ -1305,6 +1314,7 @@ export function createShareRuntime(document: Document, options: InstallOptions =
     controller.selectNewTurns = true
     controller.snapshots.clear()
     publishSelection(controller, false)
+    unsubscribeSelectionLocaleIfIdle()
   }
 
   const snapshotTurn = (controller: SessionSelection, turn: SelectableTurn): SelectedTurn => {
@@ -1497,7 +1507,7 @@ export function createShareRuntime(document: Document, options: InstallOptions =
     markdown.addEventListener('click', () => {
       const messages = selectedTurnsToShareMessages(controller.selected.values())
       if (messages.length === 0) return
-      downloadMarkdownFile(document, createShareMarkdown(messages, currentLocale(), dialog.settings))
+      downloadMarkdownFile(document, createShareMarkdown(messages, currentLocale(), ensureDialog().settings))
     })
 
     const create = makeButton(document, 'dshShareSelectionCreate')
@@ -1533,22 +1543,24 @@ export function createShareRuntime(document: Document, options: InstallOptions =
     epoch = ++renderEpoch,
   ): RenderRequest => {
     const locale = currentLocale()
-    const settings = dialog.settings
-    dialog.showLoading(groupCount, preservePreview, true)
+    const preview = ensureDialog()
+    const settings = preview.settings
+    preview.showLoading(groupCount, preservePreview, true)
     return { content, epoch, locale, preservePreview, settings }
   }
 
   const executeRender = async (request: RenderRequest): Promise<void> => {
+    const preview = ensureDialog()
     const card = createShareCard(document, request.content, request.locale, request.settings)
     try {
       const blob = await renderImage(card.element)
       if (request.epoch === renderEpoch) {
-        await dialog.showResult(blob, () => request.epoch === renderEpoch)
+        await preview.showResult(blob, () => request.epoch === renderEpoch)
       }
     } catch (error) {
       if (request.epoch === renderEpoch) {
         console.warn('[dsh-share] Failed to render conversation image', error)
-        dialog.showError(request.preservePreview)
+        preview.showError(request.preservePreview)
       }
     } finally {
       card.dispose()
@@ -1588,7 +1600,7 @@ export function createShareRuntime(document: Document, options: InstallOptions =
     clearSettingsRenderTimer()
     pendingRender = undefined
     const epoch = ++renderEpoch
-    dialog.showPendingUpdate()
+    dialog?.showPendingUpdate()
     const window = document.defaultView
     if (!window) {
       pendingRender = createRenderRequest(content, groupCount, true, epoch)
@@ -1610,17 +1622,21 @@ export function createShareRuntime(document: Document, options: InstallOptions =
     renderEpoch += 1
   }
 
-  dialog = new PreviewDialog(document, {
-    getLocale: currentLocale,
-    onSettingsChange: () => {
-      if (activeContent) scheduleSettingsRender(activeContent, activeGroupCount)
-    },
-    onDismiss: () => {
-      activeContent = undefined
-      activeGroupCount = 0
-      invalidateRenderQueue()
-    },
-  })
+  function ensureDialog(): PreviewDialog {
+    if (dialog) return dialog
+    dialog = new PreviewDialog(document, {
+      getLocale: currentLocale,
+      onSettingsChange: () => {
+        if (activeContent) scheduleSettingsRender(activeContent, activeGroupCount)
+      },
+      onDismiss: () => {
+        activeContent = undefined
+        activeGroupCount = 0
+        invalidateRenderQueue()
+      },
+    })
+    return dialog
+  }
 
   const enterSelection = (sessionId: string, source?: HTMLElement, initialTurn?: number): void => {
     for (const [id, other] of selections) {
@@ -1633,6 +1649,7 @@ export function createShareRuntime(document: Document, options: InstallOptions =
     const scroll = root?.querySelector<HTMLElement>('[data-conversation-scroll]')
       ?? document.querySelector<HTMLElement>('[data-conversation-scroll]')
     if (!scroll) return
+    subscribeSelectionLocale()
     const scrollTop = scroll.scrollTop
     controller.scroll = scroll
     controller.selectNewTurns = initialTurn === undefined
@@ -1705,8 +1722,10 @@ export function createShareRuntime(document: Document, options: InstallOptions =
       }
       selections.clear()
       unsubscribeLocale?.()
+      unsubscribeLocale = undefined
       style.remove()
-      dialog.destroy()
+      dialog?.destroy()
+      dialog = undefined
     },
   }
 }
@@ -1729,30 +1748,18 @@ export type ShareConversationActionProps =
 
 /** 官方 assistant-actions 插槽中的分享入口。 */
 export function ShareAction({
-  messageId, sessionId, shareRuntime, useSession, useShareLocale, useShareSelection,
+  sessionId, shareRuntime, useShareLocale,
 }: ShareActionProps): ReactElement {
   const strings = t(useShareLocale(snapshot => snapshot.active))
-  const selection = useShareSelection(snapshot => snapshot)
-  const turn = useSession((snapshot) => {
-    for (const node of snapshot.chat.nodes.values()) {
-      if (node.kind !== 'turn-tail') continue
-      // rc.6 的公共 ChatNode 泛型在第三方包里仍把 data 暴露为 unknown；
-      // 这里只读取官方 turn-tail 已稳定声明的两个字段。
-      const data = node.data as {
-        closing?: { finalNode: { messageId?: string } } | null
-        turn: number
-      }
-      if (data.closing?.finalNode.messageId === messageId) return data.turn
-    }
-    return 0
-  })
-  if (selection.active) return createElement(Fragment)
   const button = createElement('button',
     {
       type: 'button',
       'data-dsh-share-button': '',
       'aria-label': strings.share,
       onClick: (event: ReactMouseEvent<HTMLButtonElement>) => {
+        const turnValue = event.currentTarget.closest<HTMLElement>('[data-turn-tail]')?.dataset.turnTail
+        const turn = Number(turnValue)
+        if (turnValue === undefined || !Number.isFinite(turn)) return
         shareRuntime.enterSelection(String(sessionId), event.currentTarget, turn)
       },
     },
@@ -1766,8 +1773,8 @@ export function ShareConversationAction({
   sessionId, shareRuntime, useShareLocale, useShareSelection,
 }: ShareConversationActionProps): ReactElement {
   const strings = t(useShareLocale(snapshot => snapshot.active))
-  const selection = useShareSelection(snapshot => snapshot)
-  if (selection.active) return createElement(Fragment)
+  const selectionActive = useShareSelection(snapshot => snapshot.active)
+  if (selectionActive) return createElement(Fragment)
   const button = createElement('button', {
       type: 'button',
       'data-dsh-share-conversation': '',
