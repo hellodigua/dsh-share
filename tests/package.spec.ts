@@ -20,7 +20,6 @@ describe('DSH 插件清单', () => {
     }
 
     expect(packageJson.name).toBe('dsh-share')
-    expect(packageJson.version).toBe('0.2.0')
     expect(packageJson.private).toBeUndefined()
     expect(packageJson.author).toBe('hellodigua')
     expect(packageJson.publishConfig).toEqual({
@@ -33,6 +32,7 @@ describe('DSH 插件清单', () => {
     expect(packageJson.files).toContain('THIRD_PARTY_LICENSES.md')
     expect(packageJson.files).toContain('README.md')
     expect(packageJson.files).toContain('README.en.md')
+    expect(packageJson.files).toContain('CHANGELOG.md')
     expect(packageJson.files).toContain('assets/readme')
     expect(packageJson.repository.url).toBe('git+https://github.com/hellodigua/dsh-share.git')
     expect(packageJson.scripts.verify).toContain('pnpm typecheck')
@@ -51,6 +51,9 @@ describe('DSH 插件清单', () => {
       expect(packageJson.peerDependencies[name]).toBe('^0.1.0-rc.6')
       expect(packageJson.devDependencies[name]).toBe('0.1.0-rc.6')
     }
+    const changelog = await readFile(new URL('../CHANGELOG.md', import.meta.url), 'utf8')
+    const escapedVersion = packageJson.version.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    expect(changelog).toMatch(new RegExp(`^## \\[${escapedVersion}\\] - \\d{4}-\\d{2}-\\d{2}$`, 'm'))
   })
 
   it('不依赖本机 DSH checkout 就能安装开发依赖', async () => {
@@ -91,7 +94,7 @@ describe('DSH 插件清单', () => {
 
     expect(chineseReadme).toContain('[English](./README.en.md)')
     expect(chineseReadme).toContain('dsh plugin --profile web add dsh-share')
-    expect(chineseReadme).toContain('dsh-share@0.2.0')
+    expect(chineseReadme).toContain('dsh-share@beta')
     expect(chineseReadme).toContain('conversation.chat.assistant-actions')
     expect(chineseReadme).toContain('conversation.session.header.utilities')
     expect(chineseReadme).toContain('下载 PNG 或 Markdown')
@@ -101,7 +104,7 @@ describe('DSH 插件清单', () => {
     expect(chineseReadme).toContain('[dshfind.com](https://dshfind.com) DSH 插件超市')
     expect(englishReadme).toContain('[简体中文](./README.md)')
     expect(englishReadme).toContain('dsh plugin --profile web add dsh-share')
-    expect(englishReadme).toContain('dsh-share@0.2.0')
+    expect(englishReadme).toContain('dsh-share@beta')
     expect(englishReadme).toContain('conversation.chat.assistant-actions')
     expect(englishReadme).toContain('conversation.session.header.utilities')
     expect(englishReadme).toContain('PNG download, and Markdown download')

@@ -27,14 +27,14 @@ DSH 对话分享插件，分享单轮或多轮对话，可导出为图片或 Mar
 dsh plugin --profile web add dsh-share
 ```
 
-如需固定当前版本，使用 `dsh-share@0.2.0`。普通 `npm install dsh-share` 只会把包加入当前 Node.js 项目，不会启用 DSH 插件。
+如需体验预发布版本，将安装命令中的包名替换为 `dsh-share@beta`。普通 `npm install dsh-share` 只会把包加入当前 Node.js 项目，不会启用 DSH 插件。
 
 ## 其他安装方式
 
 ### 从 GitHub 安装
 
 ```sh
-dsh plugin --profile web add github:hellodigua/dsh-share#v0.2.0
+dsh plugin --profile web add github:hellodigua/dsh-share#vX.Y.Z
 ```
 
 仓库已经提交 `lib/` 构建产物，安装时无需在本机编译。
@@ -71,7 +71,7 @@ corepack pnpm pack --pack-destination ../local-plugins
 
 ```sh
 dsh plugin --profile web add \
-  /absolute/path/to/local-plugins/dsh-share-0.2.0.tgz
+  /absolute/path/to/local-plugins/dsh-share-X.Y.Z.tgz
 ```
 
 tarball 已包含浏览器构建产物，安装时不需要执行第三方构建脚本。

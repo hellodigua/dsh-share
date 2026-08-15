@@ -10,7 +10,7 @@ const EXPECTED_NAME = 'dsh-share'
 const EXPECTED_REPOSITORY = 'git+https://github.com/hellodigua/dsh-share.git'
 const NPM_REGISTRY = 'https://registry.npmjs.org/'
 const MAX_TARBALL_SIZE = 1024 * 1024
-const STABLE_SEMVER_PATTERN = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/
+const RELEASE_SEMVER_PATTERN = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-(?:0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*)(?:\.(?:0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*))*)?$/
 const root = resolve(import.meta.dirname, '..')
 
 const REQUIRED_FILES = [
@@ -22,6 +22,7 @@ const REQUIRED_FILES = [
   'cordis.patch.yml',
   'README.md',
   'README.en.md',
+  'CHANGELOG.md',
   'LICENSE',
   'THIRD_PARTY_LICENSES.md',
   'assets/readme/share-dialog.webp',
@@ -33,11 +34,19 @@ function fail(message) {
   throw new Error(`[package] ${message}`)
 }
 
+export function validateReleaseVersion(version) {
+  if (!RELEASE_SEMVER_PATTERN.test(version)) fail(`version 不是可发布 SemVer：${version}`)
+}
+
+export function validateChangelog(changelog, expectedVersion) {
+  const escapedVersion = expectedVersion.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const heading = new RegExp(`^## \\[${escapedVersion}\\] - \\d{4}-\\d{2}-\\d{2}$`, 'm')
+  if (!heading.test(changelog)) fail(`CHANGELOG.md 缺少 ${expectedVersion} 的日期标题`)
+}
+
 export function validatePackageManifest(packageJson) {
   if (packageJson.name !== EXPECTED_NAME) fail(`package name 必须是 ${EXPECTED_NAME}`)
-  if (!STABLE_SEMVER_PATTERN.test(packageJson.version)) {
-    fail(`version 必须是稳定版 SemVer，当前为 ${packageJson.version}`)
-  }
+  validateReleaseVersion(packageJson.version)
   if (packageJson.private !== undefined) fail('发布包不能声明 private')
   if (packageJson.author !== 'hellodigua') fail('package author 必须是 hellodigua')
   if (packageJson.license !== 'MIT') fail('package license 必须是 MIT')
@@ -111,6 +120,7 @@ export function main() {
   const packageJson = validatePackageManifest(
     JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')),
   )
+  validateChangelog(readFileSync(join(root, 'CHANGELOG.md'), 'utf8'), packageJson.version)
   const temporaryDirectory = mkdtempSync(join(tmpdir(), 'dsh-share-package-'))
   try {
     const pack = validatePackReport(packTo(temporaryDirectory), packageJson.version)

@@ -27,14 +27,14 @@ Add the plugin to the Web Profile with the DSH CLI, then restart `dsh web`:
 dsh plugin --profile web add dsh-share
 ```
 
-Use `dsh-share@0.2.0` to pin this release. A plain `npm install dsh-share` only adds the package to the current Node.js project; it does not enable the DSH plugin.
+To try a prerelease, replace the package name in the installation command with `dsh-share@beta`. A plain `npm install dsh-share` only adds the package to the current Node.js project; it does not enable the DSH plugin.
 
 ## Other installation methods
 
 ### From GitHub
 
 ```sh
-dsh plugin --profile web add github:hellodigua/dsh-share#v0.2.0
+dsh plugin --profile web add github:hellodigua/dsh-share#vX.Y.Z
 ```
 
 The repository includes the built `lib/` output, so installation does not require a local build.
@@ -71,7 +71,7 @@ Then install the generated file:
 
 ```sh
 dsh plugin --profile web add \
-  /absolute/path/to/local-plugins/dsh-share-0.2.0.tgz
+  /absolute/path/to/local-plugins/dsh-share-X.Y.Z.tgz
 ```
 
 The tarball includes the browser bundle, so installation does not need to run third-party build scripts.
