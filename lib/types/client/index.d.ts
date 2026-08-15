@@ -2,34 +2,9 @@ import type { ClientContext, ObservableSnapshot } from '@deepseek-ai/dsh-client-
 import type { LocaleSnapshot } from '@deepseek-ai/dsh-client-locale/client';
 import type { InjectFace, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots';
 import { type ReactElement } from 'react';
+import { type ShareRuntime, type ShareSelectionSnapshot } from './runtime.ts';
 export declare const name = "dsh-share/client";
 export declare const inject: string[];
-export type ImageRenderer = (element: HTMLElement) => Promise<Blob>;
-type ShareLocale = 'zh' | 'en';
-export interface InstallOptions {
-    getLocale?: () => ShareLocale;
-    renderImage?: ImageRenderer;
-    subscribeLocale?: (listener: () => void) => () => void;
-}
-export declare function renderShareImage(element: HTMLElement): Promise<Blob>;
-export interface ShareSelectionSnapshot {
-    active: boolean;
-    allSelected: boolean;
-    count: number;
-    selectedIds: ReadonlySet<string>;
-    total: number;
-}
-export interface ShareRuntime {
-    readonly document: Document;
-    getLocale(): ShareLocale;
-    selectionFor(sessionId: string): ObservableSnapshot<ShareSelectionSnapshot>;
-    enterSelection(sessionId: string, source?: HTMLElement, initialTurn?: number): void;
-    cancelSelection(sessionId: string): void;
-    toggleSelection(sessionId: string, turnId: string): void;
-    openSelected(sessionId: string): void;
-    dispose(): void;
-}
-export declare function createShareRuntime(document: Document, options?: InstallOptions): ShareRuntime;
 interface ShareRuntimeInjected {
     hooks: {
         shareLocale: ObservableSnapshot<LocaleSnapshot>;
@@ -47,5 +22,7 @@ export declare function apply(ctx: ClientContext): void;
 export { createShareCard } from './card.ts';
 export { createShareMarkdown } from './markdown.ts';
 export { findTurnContent, findTurnContentFromAction } from './dom.ts';
+export { renderShareImage, type ImageRenderer } from './preview-dialog.ts';
+export { createShareRuntime, type InstallOptions, type ShareRuntime, type ShareSelectionSnapshot, } from './runtime.ts';
 export { DEFAULT_SHARE_SETTINGS, FONT_SIZE_PRESETS, loadShareSettings, saveShareSettings, WIDTH_PRESETS, type FontSizePreset, type ShareSettings, type WidthPreset, } from './settings.ts';
 //# sourceMappingURL=index.d.ts.map
