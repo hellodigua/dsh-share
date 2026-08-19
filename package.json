@@ -1,6 +1,6 @@
 {
   "name": "dsh-share",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Share DSH Q&As or selected conversation groups as PNG or Markdown.",
   "author": "hellodigua",
   "keywords": [
