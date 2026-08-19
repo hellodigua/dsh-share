@@ -1,4 +1,5 @@
 import { toBlob } from 'html-to-image'
+import { shareExportBackground } from './background.ts'
 import { t, type ShareLocale, type Translation } from './i18n.ts'
 import {
   loadShareSettings,
@@ -16,7 +17,7 @@ export type ImageRenderer = (element: HTMLElement) => Promise<Blob>
 
 export async function renderShareImage(element: HTMLElement): Promise<Blob> {
   const blob = await toBlob(element, {
-    backgroundColor: getComputedStyle(element).backgroundColor,
+    backgroundColor: shareExportBackground(element),
     imagePlaceholder: TRANSPARENT_IMAGE_PLACEHOLDER,
     pixelRatio: 2,
     skipFonts: true,

@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { afterEach, describe, expect, it } from 'vitest'
+import { SHARE_DARK_BACKGROUND, SHARE_LIGHT_BACKGROUND } from '../src/client/background.ts'
 import { createShareCard } from '../src/client/card.ts'
 import type { ShareMessage } from '../src/client/content.ts'
 
@@ -17,6 +18,7 @@ function pair(
 
 afterEach(() => {
   document.body.innerHTML = ''
+  document.body.removeAttribute('data-ds-dark-theme')
 })
 
 describe('分享图片卡片', () => {
@@ -206,5 +208,21 @@ describe('分享图片卡片', () => {
     expect(wordmark?.parentElement?.style.getPropertyValue('--dsw-alias-label-primary-inverted'))
       .toBe('rgb(250, 250, 250)')
     card.dispose()
+  })
+
+  it('卡片导出底色始终是不透明实色', () => {
+    const prompt = document.createElement('div')
+    prompt.textContent = '问题'
+    const answer = document.createElement('div')
+    answer.textContent = '回答'
+
+    const light = createShareCard(document, pair(prompt, [answer]), 'zh')
+    expect(light.element.style.backgroundColor).toBe(SHARE_LIGHT_BACKGROUND)
+    light.dispose()
+
+    document.body.setAttribute('data-ds-dark-theme', '')
+    const dark = createShareCard(document, pair(prompt, [answer]), 'zh')
+    expect(dark.element.style.backgroundColor).toBe(SHARE_DARK_BACKGROUND)
+    dark.dispose()
   })
 })
