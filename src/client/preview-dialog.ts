@@ -2,7 +2,9 @@ import { toBlob } from 'html-to-image'
 import { shareExportBackground } from './background.ts'
 import { t, type ShareLocale, type Translation } from './i18n.ts'
 import {
+  loadDirectSingleTurn,
   loadShareSettings,
+  saveDirectSingleTurn,
   saveShareSettings,
   WIDTH_PRESETS,
   type FontSizePreset,
@@ -55,10 +57,12 @@ export class PreviewDialog {
   private readonly status: HTMLElement
   private readonly copyButton: HTMLButtonElement
   private readonly downloadButton: HTMLButtonElement
+  private readonly directSingleTurnInput: HTMLInputElement
   private readonly hideProcessInput: HTMLInputElement
   private readonly choiceButtons: HTMLButtonElement[]
   private readonly storage?: Storage
   private currentSettings: ShareSettings
+  private currentDirectSingleTurn: boolean
   private blob?: Blob
   private objectUrl?: string
 
@@ -75,6 +79,7 @@ export class PreviewDialog {
     }
     this.storage = storage
     this.currentSettings = loadShareSettings(storage)
+    this.currentDirectSingleTurn = loadDirectSingleTurn(storage)
 
     const dialog = document.createElement('dialog')
     dialog.dataset.dshShareDialog = ''
@@ -92,10 +97,16 @@ export class PreviewDialog {
           <span class="dsh-share-dialog__field-label" data-dsh-share-font-size-label></span>
           <div class="dsh-share-dialog__segmented" data-dsh-share-font-size role="group"></div>
         </div>
-        <label class="dsh-share-dialog__toggle">
-          <input data-dsh-share-hide-process type="checkbox" />
-          <span data-dsh-share-hide-process-label></span>
-        </label>
+        <div class="dsh-share-dialog__toggles">
+          <label class="dsh-share-dialog__toggle">
+            <input data-dsh-share-direct-single-turn type="checkbox" />
+            <span data-dsh-share-direct-single-turn-label></span>
+          </label>
+          <label class="dsh-share-dialog__toggle">
+            <input data-dsh-share-hide-process type="checkbox" />
+            <span data-dsh-share-hide-process-label></span>
+          </label>
+        </div>
       </div>
       <div class="dsh-share-dialog__body">
         <p class="dsh-share-dialog__message" data-dsh-share-message role="status"></p>
@@ -114,6 +125,7 @@ export class PreviewDialog {
     this.status = dialog.querySelector('[data-dsh-share-status]') as HTMLElement
     this.copyButton = dialog.querySelector('[data-dsh-share-copy]') as HTMLButtonElement
     this.downloadButton = dialog.querySelector('[data-dsh-share-download]') as HTMLButtonElement
+    this.directSingleTurnInput = dialog.querySelector('[data-dsh-share-direct-single-turn]') as HTMLInputElement
     this.hideProcessInput = dialog.querySelector('[data-dsh-share-hide-process]') as HTMLInputElement
 
     const widthGroup = dialog.querySelector('[data-dsh-share-width]') as HTMLElement
@@ -139,10 +151,12 @@ export class PreviewDialog {
     const close = dialog.querySelector('[data-dsh-share-close]') as HTMLButtonElement
     const widthLabel = dialog.querySelector('[data-dsh-share-width-label]') as HTMLElement
     const fontSizeLabel = dialog.querySelector('[data-dsh-share-font-size-label]') as HTMLElement
+    const directSingleTurnLabel = dialog.querySelector('[data-dsh-share-direct-single-turn-label]') as HTMLElement
     const hideProcessLabel = dialog.querySelector('[data-dsh-share-hide-process-label]') as HTMLElement
     this.title.textContent = strings.title
     widthLabel.textContent = strings.width
     fontSizeLabel.textContent = strings.fontSize
+    directSingleTurnLabel.textContent = strings.directSingleTurn
     hideProcessLabel.textContent = strings.hideProcess
     widthGroup.ariaLabel = strings.width
     fontSizeGroup.ariaLabel = strings.fontSize
@@ -162,6 +176,11 @@ export class PreviewDialog {
     })
     this.copyButton.addEventListener('click', () => void this.copy())
     this.downloadButton.addEventListener('click', () => this.download())
+    this.directSingleTurnInput.addEventListener('change', () => {
+      this.currentDirectSingleTurn = this.directSingleTurnInput.checked
+      saveDirectSingleTurn(this.storage, this.currentDirectSingleTurn)
+      this.updateControlState()
+    })
     this.hideProcessInput.addEventListener('change', () => {
       const next = { ...this.currentSettings, hideProcess: this.hideProcessInput.checked }
       this.currentSettings = next
@@ -175,6 +194,10 @@ export class PreviewDialog {
 
   get settings(): ShareSettings {
     return { ...this.currentSettings }
+  }
+
+  get directSingleTurn(): boolean {
+    return this.currentDirectSingleTurn
   }
 
   /** 弹窗会跨语言切换复用；每次显示前都从 DSH 官方 locale 刷新静态文案。 */
@@ -193,9 +216,11 @@ export class PreviewDialog {
     }
     const widthLabel = this.element.querySelector<HTMLElement>('[data-dsh-share-width-label]')
     const fontSizeLabel = this.element.querySelector<HTMLElement>('[data-dsh-share-font-size-label]')
+    const directSingleTurnLabel = this.element.querySelector<HTMLElement>('[data-dsh-share-direct-single-turn-label]')
     const hideProcessLabel = this.element.querySelector<HTMLElement>('[data-dsh-share-hide-process-label]')
     if (widthLabel) widthLabel.textContent = strings.width
     if (fontSizeLabel) fontSizeLabel.textContent = strings.fontSize
+    if (directSingleTurnLabel) directSingleTurnLabel.textContent = strings.directSingleTurn
     if (hideProcessLabel) hideProcessLabel.textContent = strings.hideProcess
     if (widthGroup) widthGroup.ariaLabel = strings.width
     if (fontSizeGroup) fontSizeGroup.ariaLabel = strings.fontSize
@@ -382,6 +407,7 @@ export class PreviewDialog {
         : button.dataset.value === this.currentSettings.fontSize
       button.setAttribute('aria-pressed', String(selected))
     }
+    this.directSingleTurnInput.checked = this.currentDirectSingleTurn
     this.hideProcessInput.checked = this.currentSettings.hideProcess
   }
 

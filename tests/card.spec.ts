@@ -144,6 +144,72 @@ describe('分享图片卡片', () => {
     card.dispose()
   })
 
+  it('适配 alpha.3 的折叠过程成员，并按过程边界识别最终回答', () => {
+    const prompt = document.createElement('div')
+    prompt.dataset.chatFlowKind = 'user'
+    prompt.textContent = '用户问题'
+    const intermediate = document.createElement('div')
+    intermediate.dataset.chatFlowKind = 'assistant-step'
+    intermediate.dataset.turnProcessMember = 'true'
+    intermediate.dataset.turnProcessHidden = 'true'
+    intermediate.setAttribute('hidden', 'until-found')
+    intermediate.innerHTML = '<div data-variant="think">新版思考过程</div>'
+    const toolCall = document.createElement('div')
+    toolCall.dataset.chatFlowKind = 'tool-call'
+    toolCall.dataset.turnProcessMember = 'true'
+    toolCall.setAttribute('hidden', 'until-found')
+    toolCall.innerHTML = '<div data-disclosure-row><span>Bash</span><span>pnpm test</span></div>'
+    const finalAnswer = document.createElement('div')
+    finalAnswer.dataset.chatFlowKind = 'assistant-step'
+    finalAnswer.dataset.turnProcessAnswer = 'true'
+    finalAnswer.innerHTML = `
+      <div data-turn-process-inline hidden="until-found">
+        <div data-variant="think">行内思考过程</div>
+      </div>
+      <article>最终回答</article>`
+
+    const visibleCard = createShareCard(
+      document,
+      pair(prompt, [intermediate, toolCall, finalAnswer]),
+      'zh',
+      { width: 'tablet', fontSize: 'normal', hideProcess: false },
+    )
+    expect(visibleCard.element.textContent).toContain('新版思考过程')
+    expect(visibleCard.element.textContent).toContain('行内思考过程')
+    expect(visibleCard.element.textContent).toContain('Bash')
+    expect(visibleCard.element.querySelector('[hidden="until-found"]')).toBeNull()
+    expect(visibleCard.element.querySelector('[data-turn-process-member]')).toBeNull()
+    expect(visibleCard.element.querySelector('[data-turn-process-inline]')).toBeNull()
+    visibleCard.dispose()
+
+    const compactCard = createShareCard(
+      document,
+      pair(prompt, [intermediate, toolCall, finalAnswer]),
+      'zh',
+      { width: 'tablet', fontSize: 'normal', hideProcess: true },
+    )
+    expect(compactCard.element.textContent).toContain('最终回答')
+    expect(compactCard.element.textContent).not.toContain('新版思考过程')
+    expect(compactCard.element.textContent).not.toContain('行内思考过程')
+    expect(compactCard.element.textContent).not.toContain('Bash')
+    compactCard.dispose()
+
+    // 过程展开时最终回答不再带 data-turn-process-answer，仍应通过 member 边界识别。
+    finalAnswer.removeAttribute('data-turn-process-answer')
+    const cleanCard = createShareCard(
+      document,
+      pair(prompt, [intermediate, toolCall, finalAnswer]),
+      'zh',
+      { width: 'tablet', fontSize: 'normal', hideProcess: true },
+    )
+    expect(cleanCard.element.textContent).toContain('用户问题')
+    expect(cleanCard.element.textContent).toContain('最终回答')
+    expect(cleanCard.element.textContent).not.toContain('新版思考过程')
+    expect(cleanCard.element.textContent).not.toContain('行内思考过程')
+    expect(cleanCard.element.textContent).not.toContain('Bash')
+    cleanCard.dispose()
+  })
+
   it('按预设设置图片宽度和正文基准字号', () => {
     const prompt = document.createElement('div')
     prompt.textContent = '问题'

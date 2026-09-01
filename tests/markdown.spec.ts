@@ -73,4 +73,20 @@ describe('Markdown 导出', () => {
     expect(markdown).not.toContain('Bash')
     expect(markdown).not.toContain('中间回答')
   })
+
+  it('按 alpha.3 的过程成员标记保留展开状态下的最终回答', () => {
+    const message = assistant(2, 5, 0, true)
+    const [intermediate, tool, answer] = message.elements
+    intermediate?.setAttribute('data-turn-process-member', 'true')
+    tool?.setAttribute('data-turn-process-member', 'true')
+
+    const markdown = createShareMarkdown([
+      message,
+    ], 'zh', { width: 'tablet', fontSize: 'normal', hideProcess: true })
+
+    expect(markdown).toContain('回答 2')
+    expect(markdown).not.toContain('Think')
+    expect(markdown).not.toContain('Bash')
+    expect(markdown).not.toContain('中间回答')
+  })
 })

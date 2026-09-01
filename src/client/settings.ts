@@ -28,6 +28,7 @@ export const DEFAULT_SHARE_SETTINGS: ShareSettings = {
 const WIDTH_STORAGE_KEY = 'dsh-share.width'
 const FONT_SIZE_STORAGE_KEY = 'dsh-share.font-size'
 const HIDE_PROCESS_STORAGE_KEY = 'dsh-share.hide-process'
+const DIRECT_SINGLE_TURN_STORAGE_KEY = 'dsh-share.direct-single-turn'
 const WIDTH_VALUES = new Set<WidthPreset>(['phone', 'tablet', 'desktop'])
 const FONT_SIZE_VALUES = new Set<FontSizePreset>(['normal', 'large', 'xlarge'])
 
@@ -56,6 +57,24 @@ export function saveShareSettings(storage: Storage | undefined, settings: ShareS
     storage.setItem(WIDTH_STORAGE_KEY, settings.width)
     storage.setItem(FONT_SIZE_STORAGE_KEY, settings.fontSize)
     storage.setItem(HIDE_PROCESS_STORAGE_KEY, String(settings.hideProcess))
+  } catch {
+    // localStorage 可能被浏览器策略禁用；设置仍在当前弹窗内有效。
+  }
+}
+
+export function loadDirectSingleTurn(storage?: Storage): boolean {
+  if (!storage) return false
+  try {
+    return storage.getItem(DIRECT_SINGLE_TURN_STORAGE_KEY) === 'true'
+  } catch {
+    return false
+  }
+}
+
+export function saveDirectSingleTurn(storage: Storage | undefined, enabled: boolean): void {
+  if (!storage) return
+  try {
+    storage.setItem(DIRECT_SINGLE_TURN_STORAGE_KEY, String(enabled))
   } catch {
     // localStorage 可能被浏览器策略禁用；设置仍在当前弹窗内有效。
   }

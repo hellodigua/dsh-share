@@ -18,7 +18,7 @@ import {
   renderShareImage,
   type ImageRenderer,
 } from './preview-dialog.ts'
-import type { ShareSettings } from './settings.ts'
+import { loadDirectSingleTurn, type ShareSettings } from './settings.ts'
 import { STYLE_ID, STYLE_TEXT } from './styles.ts'
 
 export interface InstallOptions {
@@ -638,6 +638,15 @@ export function createShareRuntime(document: Document, options: InstallOptions =
     return dialog
   }
 
+  const directSingleTurnEnabled = (): boolean => {
+    if (dialog) return dialog.directSingleTurn
+    try {
+      return loadDirectSingleTurn(document.defaultView?.localStorage)
+    } catch {
+      return false
+    }
+  }
+
   const enterSelection = (sessionId: string, source?: HTMLElement, initialTurn?: number): void => {
     for (const [id, other] of selections) {
       if (id !== sessionId && other.snapshot.active) resetSelection(other)
@@ -649,6 +658,19 @@ export function createShareRuntime(document: Document, options: InstallOptions =
     const scroll = root?.querySelector<HTMLElement>('[data-conversation-scroll]')
       ?? document.querySelector<HTMLElement>('[data-conversation-scroll]')
     if (!scroll) return
+    if (initialTurn !== undefined && directSingleTurnEnabled()) {
+      const selected = selectableTurns(scroll).find(turn => turn.turn === initialTurn)
+      if (!selected) return
+      const messages = selectedTurnsToShareMessages([{
+        content: snapshotTurnContent(selected.content),
+        id: selected.id,
+        turn: selected.turn,
+      }])
+      activeContent = messages
+      activeGroupCount = 1
+      void renderContent(messages, activeGroupCount)
+      return
+    }
     subscribeSelectionLocale()
     const scrollTop = scroll.scrollTop
     controller.scroll = scroll

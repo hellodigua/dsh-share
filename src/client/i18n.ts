@@ -27,6 +27,7 @@ export interface Translation {
   close: string
   width: string
   fontSize: string
+  directSingleTurn: string
   hideProcess: string
   phone: string
   tablet: string
@@ -68,6 +69,7 @@ export function t(locale: ShareLocale): Translation {
       close: '关闭',
       width: '宽度',
       fontSize: '字号',
+      directSingleTurn: '分享直接生成图片',
       hideProcess: '不展示过程',
       phone: '手机',
       tablet: '平板',
@@ -104,6 +106,7 @@ export function t(locale: ShareLocale): Translation {
     close: 'Close',
     width: 'Width',
     fontSize: 'Size',
+    directSingleTurn: 'Generate image on click',
     hideProcess: 'Hide process',
     phone: 'Phone',
     tablet: 'Tablet',

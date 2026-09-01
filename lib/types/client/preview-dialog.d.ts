@@ -18,14 +18,17 @@ export declare class PreviewDialog {
     private readonly status;
     private readonly copyButton;
     private readonly downloadButton;
+    private readonly directSingleTurnInput;
     private readonly hideProcessInput;
     private readonly choiceButtons;
     private readonly storage?;
     private currentSettings;
+    private currentDirectSingleTurn;
     private blob?;
     private objectUrl?;
     constructor(document: Document, options: PreviewDialogOptions);
     get settings(): ShareSettings;
+    get directSingleTurn(): boolean;
     /** 弹窗会跨语言切换复用；每次显示前都从 DSH 官方 locale 刷新静态文案。 */
     private updateCopy;
     showLoading(turnCount: number, preservePreview?: boolean, selectionExport?: boolean): void;

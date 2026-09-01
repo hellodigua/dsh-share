@@ -26,6 +26,7 @@ export interface Translation {
     close: string;
     width: string;
     fontSize: string;
+    directSingleTurn: string;
     hideProcess: string;
     phone: string;
     tablet: string;

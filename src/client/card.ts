@@ -94,9 +94,25 @@ export function cloneShareMessage(
   const clone = source.cloneNode(true) as HTMLElement
   clone.dataset.dshShareMessage = ''
 
+  // alpha.3 会用 hidden="until-found" 折叠过程成员；分享副本需要脱离页面折叠状态。
+  if (source.dataset.turnProcessMember === 'true' && clone.getAttribute('hidden') === 'until-found') {
+    clone.removeAttribute('hidden')
+  }
+  clone.removeAttribute('data-turn-process-member')
+  clone.removeAttribute('data-turn-process-hidden')
+  clone.removeAttribute('data-turn-process-answer')
+
   if (hideReasoning) {
+    for (const reasoning of clone.querySelectorAll<HTMLElement>('[data-turn-process-inline]')) {
+      reasoning.remove()
+    }
     for (const reasoning of clone.querySelectorAll<HTMLElement>('[data-variant="think"]')) {
       reasoning.remove()
+    }
+  } else {
+    for (const reasoning of clone.querySelectorAll<HTMLElement>('[data-turn-process-inline]')) {
+      if (reasoning.getAttribute('hidden') === 'until-found') reasoning.removeAttribute('hidden')
+      reasoning.removeAttribute('data-turn-process-inline')
     }
   }
 
@@ -128,9 +144,20 @@ export function visibleAssistantElements(
   elements: readonly HTMLElement[],
   hideProcess: boolean,
 ): HTMLElement[] {
-  return hideProcess
-    ? elements.filter(element => element.dataset.chatFlowKind === 'assistant-step').slice(-1)
-    : [...elements]
+  if (!hideProcess) return [...elements]
+
+  const assistantSteps = elements.filter(element => element.dataset.chatFlowKind === 'assistant-step')
+  const explicitAnswers = assistantSteps.filter(element => element.dataset.turnProcessAnswer === 'true')
+  if (explicitAnswers.length > 0) return explicitAnswers
+
+  const hasTurnProcessMembers = elements.some(element => element.dataset.turnProcessMember === 'true')
+  if (hasTurnProcessMembers) {
+    const answers = assistantSteps.filter(element => element.dataset.turnProcessMember !== 'true')
+    if (answers.length > 0) return answers
+  }
+
+  // rc.6 等旧结构没有过程成员标记，继续保留最后一个 assistant-step。
+  return assistantSteps.slice(-1)
 }
 
 function createBrandWordmark(document: Document): HTMLElement {

@@ -11,4 +11,6 @@ export declare const DEFAULT_SHARE_SETTINGS: ShareSettings;
 /** 读取失败时回到默认值，避免隐私模式下 localStorage 异常阻断分享功能。 */
 export declare function loadShareSettings(storage?: Storage): ShareSettings;
 export declare function saveShareSettings(storage: Storage | undefined, settings: ShareSettings): void;
+export declare function loadDirectSingleTurn(storage?: Storage): boolean;
+export declare function saveDirectSingleTurn(storage: Storage | undefined, enabled: boolean): void;
 //# sourceMappingURL=settings.d.ts.map

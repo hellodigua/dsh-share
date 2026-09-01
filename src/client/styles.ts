@@ -18,7 +18,7 @@ export const STYLE_TEXT: string = `
 }
 /* 官方 slot 固定在分支按钮前；只调整 flex 视觉顺序，不移动 React 管理的 DOM。 */
 [data-dsh-share-button] { order: 1; }
-[data-time-hover-root] > div:has([data-dsh-share-button]) > span:last-child { order: 2; }
+div:has([data-dsh-share-button]) > span { order: 2; }
 [data-dsh-share-button]:hover {
   background: var(--dsw-alias-interactive-bg-hover, rgba(127, 127, 127, .12));
   color: var(--dsw-alias-label-secondary, currentColor);
@@ -326,9 +326,14 @@ export const STYLE_TEXT: string = `
   display: inline-flex;
   font-size: 13px;
   gap: 7px;
-  margin-left: auto;
   user-select: none;
   white-space: nowrap;
+}
+.dsh-share-dialog__toggles {
+  align-items: center;
+  display: inline-flex;
+  gap: 14px;
+  margin-left: auto;
 }
 .dsh-share-dialog__toggle input {
   accent-color: #4d6bfe;

@@ -322,10 +322,9 @@ describe('分享按钮运行时', () => {
     expect(document.querySelector('[data-dsh-share-dialog]')).toBeNull()
   })
 
-  it('把单轮分享按钮显示在分支右侧，并保持时间信息在最后', () => {
+  it('把单轮分享按钮显示在分支右侧，并保持用量和时间信息在其后', () => {
     const runtime = createShareRuntime(document)
     const turnTail = document.createElement('div')
-    turnTail.dataset.timeHoverRoot = ''
     const row = document.createElement('div')
     row.style.display = 'flex'
     row.innerHTML = `
@@ -334,12 +333,16 @@ describe('分享按钮运行时', () => {
         <button data-dsh-share-button></button>
       </div>
       <button data-branch></button>
+      <span data-usage><button></button></span>
+      <span data-duration><button></button></span>
       <span data-clock></span>`
     turnTail.append(row)
     document.body.append(turnTail)
 
     expect(getComputedStyle(row.querySelector('[data-branch]') as HTMLElement).order).toBe('')
     expect(getComputedStyle(row.querySelector('[data-dsh-share-button]') as HTMLElement).order).toBe('1')
+    expect(getComputedStyle(row.querySelector('[data-usage]') as HTMLElement).order).toBe('2')
+    expect(getComputedStyle(row.querySelector('[data-duration]') as HTMLElement).order).toBe('2')
     expect(getComputedStyle(row.querySelector('[data-clock]') as HTMLElement).order).toBe('2')
 
     runtime.dispose()
@@ -661,6 +664,53 @@ describe('分享按钮运行时', () => {
     expect(revokeObjectURL).toHaveBeenCalledWith('blob:dsh-share-preview')
   })
 
+  it('开启分享直接生成图片后，单轮按钮直接打开预览且顶部入口仍进入多选', async () => {
+    Object.defineProperty(URL, 'createObjectURL', {
+      configurable: true,
+      value: vi.fn(() => 'blob:dsh-share-direct'),
+    })
+    Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: vi.fn() })
+    window.localStorage.setItem('dsh-share.direct-single-turn', 'true')
+
+    const fixture = createConversation()
+    addTurn(fixture, 'first', 1)
+    const tail = addTurn(fixture, 'direct', 2)
+    addTurn(fixture, 'third', 3)
+    const renderImage = vi.fn(async (element: HTMLElement) => {
+      expect(element.textContent).toContain('问题 direct')
+      expect(element.textContent).toContain('回答 direct')
+      expect(element.textContent).not.toContain('问题 first')
+      expect(element.textContent).not.toContain('问题 third')
+      return new Blob(['png'], { type: 'image/png' })
+    })
+    const runtime = createShareRuntime(document, { renderImage })
+
+    triggerShareAction(tail, runtime, 'message-2')
+
+    expect(runtime.selectionFor('session-1').getSnapshot()).toMatchObject({
+      active: false,
+      count: 0,
+      total: 0,
+    })
+    expect(fixture.scroll.querySelector('[data-dsh-share-selection-footer]')).toBeNull()
+    await vi.waitFor(() => expect(renderImage).toHaveBeenCalledOnce())
+    await vi.waitFor(() => {
+      const image = document.querySelector('[data-dsh-share-preview]') as HTMLImageElement
+      expect(image.src).toBe('blob:dsh-share-direct')
+      expect(image.hidden).toBe(false)
+    })
+
+    ;(document.querySelector('[data-dsh-share-close]') as HTMLButtonElement).click()
+    clickHeaderShare(runtime, fixture.source)
+    expect(runtime.selectionFor('session-1').getSnapshot()).toMatchObject({
+      active: true,
+      count: 3,
+      total: 3,
+    })
+
+    runtime.dispose()
+  })
+
   it('单轮入口只为已选问答建立快照，首次选择其他轮次后缓存复用', async () => {
     const fixture = createConversation()
     addTurn(fixture, 'first', 1)
@@ -707,6 +757,15 @@ describe('分享按钮运行时', () => {
     ;(fixture.scroll.querySelector('[data-dsh-share-selection-create]') as HTMLButtonElement).click()
     await vi.waitFor(() => expect(renderImage).toHaveBeenCalledTimes(1))
     expect(renderedSettings[0]).toEqual({ width: '768px', fontSize: '16px' })
+
+    const directToggle = document.querySelector('[data-dsh-share-direct-single-turn]') as HTMLInputElement
+    const hideProcessToggle = document.querySelector('[data-dsh-share-hide-process]') as HTMLInputElement
+    expect(directToggle.checked).toBe(false)
+    expect(directToggle.parentElement?.textContent).toContain('分享直接生成图片')
+    expect(directToggle.parentElement?.nextElementSibling).toBe(hideProcessToggle.parentElement)
+    directToggle.click()
+    expect(window.localStorage.getItem('dsh-share.direct-single-turn')).toBe('true')
+    expect(renderImage).toHaveBeenCalledTimes(1)
 
     ;(document.querySelector('[data-dsh-share-choice="width"][data-value="desktop"]') as HTMLButtonElement).click()
     await vi.waitFor(() => expect(renderImage).toHaveBeenCalledTimes(2))

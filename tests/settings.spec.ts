@@ -4,7 +4,9 @@ import { describe, expect, it } from 'vitest'
 import {
   DEFAULT_SHARE_SETTINGS,
   FONT_SIZE_PRESETS,
+  loadDirectSingleTurn,
   loadShareSettings,
+  saveDirectSingleTurn,
   saveShareSettings,
   WIDTH_PRESETS,
 } from '../src/client/settings.ts'
@@ -45,5 +47,16 @@ describe('分享图片设置', () => {
     storage.setItem('dsh-share.font-size', 'tiny')
     storage.setItem('dsh-share.hide-process', 'invalid')
     expect(loadShareSettings(storage)).toEqual(DEFAULT_SHARE_SETTINGS)
+  })
+
+  it('单轮点击直接生成图片默认关闭，并可单独持久化', () => {
+    const storage = createMemoryStorage()
+    expect(loadDirectSingleTurn(storage)).toBe(false)
+
+    saveDirectSingleTurn(storage, true)
+    expect(loadDirectSingleTurn(storage)).toBe(true)
+
+    storage.setItem('dsh-share.direct-single-turn', 'invalid')
+    expect(loadDirectSingleTurn(storage)).toBe(false)
   })
 })
