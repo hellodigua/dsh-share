@@ -1,4 +1,5 @@
-import type { ClientContext, ObservableSnapshot } from '@deepseek-ai/dsh-client-runtime/client';
+import type { Context } from '@deepseek-ai/cordis';
+import type { ObservableSnapshot } from '@deepseek-ai/dsh-client-store';
 import type { LocaleSnapshot } from '@deepseek-ai/dsh-client-locale/client';
 import type { InjectFace, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots';
 import { type ReactElement } from 'react';
@@ -18,7 +19,7 @@ export type ShareConversationActionProps = PropsRuntime<'conversation.session.he
 export declare function ShareAction({ sessionId, shareRuntime, useShareLocale, }: ShareActionProps): ReactElement;
 /** 官方 Session Header 右侧 utilities 插槽中的多轮分享入口。 */
 export declare function ShareConversationAction({ sessionId, shareRuntime, useShareLocale, useShareSelection, }: ShareConversationActionProps): ReactElement;
-export declare function apply(ctx: ClientContext): void;
+export declare function apply(ctx: Context): void;
 export { createShareCard } from './card.ts';
 export { createShareMarkdown } from './markdown.ts';
 export { findTurnContent, findTurnContentFromAction } from './dom.ts';

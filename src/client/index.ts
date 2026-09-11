@@ -1,10 +1,14 @@
-import type { ClientContext, ObservableSnapshot } from '@deepseek-ai/dsh-client-runtime/client'
+import type { Context } from '@deepseek-ai/cordis'
+import type { ObservableSnapshot } from '@deepseek-ai/dsh-client-store'
 import type { LocaleSnapshot } from '@deepseek-ai/dsh-client-locale/client'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
+import type {} from '@deepseek-ai/dsh-client-ui-chat/client'
+import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
+import type {} from '@deepseek-ai/dsh-client-ui-session/client'
 import { IconShareOutline16, Tooltip } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { InjectFace, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import { createElement, Fragment, type MouseEvent as ReactMouseEvent, type ReactElement } from 'react'
-import { t } from './i18n.ts'
+import { normalizeShareLocale, t } from './i18n.ts'
 import {
   createShareRuntime,
   type ShareRuntime,
@@ -34,7 +38,7 @@ export type ShareConversationActionProps =
 export function ShareAction({
   sessionId, shareRuntime, useShareLocale,
 }: ShareActionProps): ReactElement {
-  const strings = t(useShareLocale(snapshot => snapshot.active))
+  const strings = t(normalizeShareLocale(useShareLocale(snapshot => snapshot.active)))
   const button = createElement('button',
     {
       type: 'button',
@@ -56,7 +60,7 @@ export function ShareAction({
 export function ShareConversationAction({
   sessionId, shareRuntime, useShareLocale, useShareSelection,
 }: ShareConversationActionProps): ReactElement {
-  const strings = t(useShareLocale(snapshot => snapshot.active))
+  const strings = t(normalizeShareLocale(useShareLocale(snapshot => snapshot.active)))
   const selectionActive = useShareSelection(snapshot => snapshot.active)
   if (selectionActive) return createElement(Fragment)
   const button = createElement('button', {
@@ -70,12 +74,12 @@ export function ShareConversationAction({
   return createElement(Tooltip, { label: strings.shareConversation, side: 'bottom', children: button })
 }
 
-export function apply(ctx: ClientContext): void {
+export function apply(ctx: Context): void {
   let sharedRuntime: ShareRuntime | undefined
   let registrations = 0
   const runtimeForRegistration = (): ShareRuntime => {
     sharedRuntime ??= createShareRuntime(document, {
-      getLocale: () => ctx.locale.getLocale().active,
+      getLocale: () => normalizeShareLocale(ctx.locale.getLocale().active),
       subscribeLocale: listener => ctx.locale.subscribe(listener),
     })
     return sharedRuntime

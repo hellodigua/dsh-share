@@ -1,4 +1,4 @@
-import type { ObservableSnapshot } from '@deepseek-ai/dsh-client-runtime/client';
+import type { ObservableSnapshot } from '@deepseek-ai/dsh-client-store';
 import { type ShareLocale } from './i18n.ts';
 import { type ImageRenderer } from './preview-dialog.ts';
 export interface InstallOptions {

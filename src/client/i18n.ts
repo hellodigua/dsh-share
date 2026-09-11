@@ -1,5 +1,9 @@
 export type ShareLocale = 'zh' | 'en'
 
+export function normalizeShareLocale(locale: string): ShareLocale {
+  return locale.toLowerCase().startsWith('zh') ? 'zh' : 'en'
+}
+
 export interface Translation {
   title: string
   selectedTitle(count: number): string
@@ -37,7 +41,7 @@ export interface Translation {
   xlarge: string
 }
 export function getDocumentLocale(document: Document): ShareLocale {
-  return document.documentElement.lang.toLowerCase().startsWith('zh') ? 'zh' : 'en'
+  return normalizeShareLocale(document.documentElement.lang)
 }
 
 export function t(locale: ShareLocale): Translation {

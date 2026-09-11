@@ -1,4 +1,5 @@
 export type ShareLocale = 'zh' | 'en';
+export declare function normalizeShareLocale(locale: string): ShareLocale;
 export interface Translation {
     title: string;
     selectedTitle(count: number): string;
