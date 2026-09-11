@@ -58,6 +58,18 @@ describe('DSH 插件清单', () => {
     expect(changelog).toMatch(new RegExp(`^## \\[${escapedVersion}\\] - \\d{4}-\\d{2}-\\d{2}$`, 'm'))
   })
 
+  it('公开快照类型的依赖由消费者可安装的 peer 提供', async () => {
+    const manifest = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'))
+    const dependency = '@deepseek-ai/dsh-client-store'
+    for (const file of ['../lib/types/client/index.d.ts', '../lib/types/client/runtime.d.ts']) {
+      const declaration = await readFile(new URL(file, import.meta.url), 'utf8')
+      expect(declaration).toContain(`from '${dependency}'`)
+    }
+    expect(manifest.peerDependencies[dependency]).toBe('^0.1.5-rc.1')
+    expect(manifest.devDependencies[dependency]).toBe('0.1.5-rc.1')
+    expect(manifest.peerDependenciesMeta?.[dependency]?.optional).not.toBe(true)
+  })
+
   it('不依赖本机 DSH checkout 就能安装开发依赖', async () => {
     const packageJson = await readFile(new URL('../package.json', import.meta.url), 'utf8')
     expect(packageJson).not.toContain('link:../')
