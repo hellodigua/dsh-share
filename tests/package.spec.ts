@@ -43,14 +43,15 @@ describe('DSH 插件清单', () => {
     expect(packageJson.dsh.client.platform).toBe('web')
     expect(packageJson.dsh.client.inject).toEqual([
       '@deepseek-ai/dsh-client-locale',
-      '@deepseek-ai/dsh-client-runtime',
+      '@deepseek-ai/dsh-client-ui-renderer',
+      '@deepseek-ai/dsh-client-ui-chat',
       '@deepseek-ai/dsh-client-ui-conversation',
       '@deepseek-ai/dsh-client-ui-primitives',
     ])
     expect(packageJson.peerDependencies.react).toBe('^18.2.0')
     for (const name of packageJson.dsh.client.inject) {
-      expect(packageJson.peerDependencies[name]).toBe('^0.1.0-rc.6')
-      expect(packageJson.devDependencies[name]).toBe('0.1.0-rc.6')
+      expect(packageJson.peerDependencies[name]).toBe('^0.1.5-rc.1')
+      expect(packageJson.devDependencies[name]).toBe('0.1.5-rc.1')
     }
     const changelog = await readFile(new URL('../CHANGELOG.md', import.meta.url), 'utf8')
     const escapedVersion = packageJson.version.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
