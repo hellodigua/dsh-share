@@ -72,7 +72,7 @@ Run `corepack pnpm release:check` before a release. See [RELEASING.md](https://g
 
 ## Compatibility
 
-The development baseline is `@deepseek-ai/dsh 0.1.5-rc.1`, with a runtime dependency range of `^0.1.5-rc.1`. Share actions use the official `conversation.chat.assistant-actions` and `conversation.session.header.utilities` slots, and do not scan or modify the action bar DOM. Selection mode adds checkboxes through `data-chat-flow-kind` and other stable `data-*` attributes, and does not depend on CSS Module class names; changes to the conversation structure may require a plugin update.
+The development baseline is `@deepseek-ai/dsh 0.1.7-rc.2`, with a runtime dependency range of `^0.1.7-rc.2`. Share actions use the official `conversation.chat.assistant-actions` and `conversation.session.header.utilities` slots, and do not scan or modify the action bar DOM. Selection mode adds checkboxes through `data-chat-flow-kind` and other stable `data-*` attributes, and does not depend on CSS Module class names; changes to the conversation structure may require a plugin update.
 
 ## Known limitations
 

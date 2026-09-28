@@ -31,7 +31,7 @@ export function snapshotTurnContent(content: TurnContent): TurnContent {
 
 /**
  * 这里集中保存当前 DSH 页面结构的假设，方便上游 DOM 调整后只改一个地方。
- * 从 turn-tail 向前回溯到本轮 user 节点，同时收集 assistant-step、tool-call 和中途 steering。
+ * 从 turn-tail 回溯到本轮 user，并展开过程分组中的消息座位，保留原始顺序。
  */
 export function findTurnContent(tail: HTMLElement): TurnContent | undefined {
   const flowTail = tail.closest<HTMLElement>(TURN_FLOW_SELECTOR)
@@ -47,6 +47,13 @@ export function findTurnContent(tail: HTMLElement): TurnContent | undefined {
 
     if (kind === 'assistant-step' || kind === 'tool-call') {
       answers.unshift(sibling)
+    } else if (sibling.hasAttribute('data-step-process')) {
+      const members = sibling.querySelectorAll<HTMLElement>(
+        '[data-step-process-content] > [data-chat-flow-kind]',
+      )
+      answers.unshift(...[...members].filter(member =>
+        member.dataset.chatFlowKind === 'assistant-step' || member.dataset.chatFlowKind === 'tool-call',
+      ))
     } else if (kind === 'steering') {
       prompts.unshift(sibling)
     } else if (kind === 'user') {

@@ -50,8 +50,8 @@ describe('DSH 插件清单', () => {
     ])
     expect(packageJson.peerDependencies.react).toBe('^18.2.0')
     for (const name of packageJson.dsh.client.inject) {
-      expect(packageJson.peerDependencies[name]).toBe('^0.1.5-rc.1')
-      expect(packageJson.devDependencies[name]).toBe('0.1.5-rc.1')
+      expect(packageJson.peerDependencies[name]).toBe('^0.1.7-rc.2')
+      expect(packageJson.devDependencies[name]).toBe('0.1.7-rc.2')
     }
     const changelog = await readFile(new URL('../CHANGELOG.md', import.meta.url), 'utf8')
     const escapedVersion = packageJson.version.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
@@ -65,8 +65,8 @@ describe('DSH 插件清单', () => {
       const declaration = await readFile(new URL(file, import.meta.url), 'utf8')
       expect(declaration).toContain(`from '${dependency}'`)
     }
-    expect(manifest.peerDependencies[dependency]).toBe('^0.1.5-rc.1')
-    expect(manifest.devDependencies[dependency]).toBe('0.1.5-rc.1')
+    expect(manifest.peerDependencies[dependency]).toBe('^0.1.7-rc.2')
+    expect(manifest.devDependencies[dependency]).toBe('0.1.7-rc.2')
     expect(manifest.peerDependenciesMeta?.[dependency]?.optional).not.toBe(true)
   })
 

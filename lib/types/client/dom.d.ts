@@ -18,7 +18,7 @@ export declare function snapshotElements(elements: readonly HTMLElement[]): HTML
 export declare function snapshotTurnContent(content: TurnContent): TurnContent;
 /**
  * 这里集中保存当前 DSH 页面结构的假设，方便上游 DOM 调整后只改一个地方。
- * 从 turn-tail 向前回溯到本轮 user 节点，同时收集 assistant-step、tool-call 和中途 steering。
+ * 从 turn-tail 回溯到本轮 user，并展开过程分组中的消息座位，保留原始顺序。
  */
 export declare function findTurnContent(tail: HTMLElement): TurnContent | undefined;
 /** 从官方 assistant-actions 插槽渲染的按钮定位并收集当前轮内容。 */

@@ -94,7 +94,7 @@ export function cloneShareMessage(
   const clone = source.cloneNode(true) as HTMLElement
   clone.dataset.dshShareMessage = ''
 
-  // alpha.3 会用 hidden="until-found" 折叠过程成员；分享副本需要脱离页面折叠状态。
+  // 分享副本需要脱离页面的过程折叠状态。
   if (source.dataset.turnProcessMember === 'true' && clone.getAttribute('hidden') === 'until-found') {
     clone.removeAttribute('hidden')
   }
@@ -146,7 +146,9 @@ export function visibleAssistantElements(
 ): HTMLElement[] {
   if (!hideProcess) return [...elements]
 
-  const assistantSteps = elements.filter(element => element.dataset.chatFlowKind === 'assistant-step')
+  const assistantSteps = elements.filter(element =>
+    element.dataset.chatFlowKind === 'assistant-step' && element.dataset.chatGroupPart !== 'reasoning',
+  )
   const explicitAnswers = assistantSteps.filter(element => element.dataset.turnProcessAnswer === 'true')
   if (explicitAnswers.length > 0) return explicitAnswers
 
@@ -156,7 +158,7 @@ export function visibleAssistantElements(
     if (answers.length > 0) return answers
   }
 
-  // rc.6 等旧结构没有过程成员标记，继续保留最后一个 assistant-step。
+  // 未折叠的视图没有过程成员标记，以最后一个回答座位为准。
   return assistantSteps.slice(-1)
 }
 

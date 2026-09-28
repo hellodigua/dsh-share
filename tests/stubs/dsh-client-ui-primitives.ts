@@ -1,7 +1,7 @@
 import { createElement, type ReactElement } from 'react'
 
 /** 单测用可识别节点代替官方图标，避免依赖 DSH 仓库。 */
-export function IconShareOutline16({ size = 16 }: { size?: number }): ReactElement {
+export function IconShareOutlineRegular({ size = 16 }: { size?: number }): ReactElement {
   return createElement('svg', { 'data-official-share-icon': '', height: size, width: size })
 }
 
