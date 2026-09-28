@@ -84,7 +84,9 @@ function selectableTurns(root: ParentNode): SelectableTurn[] {
     const questionAnchor = content.prompts[0]
     if (!questionAnchor || content.answers.length === 0) continue
     turns.push({
-      answerAnchors: content.answers,
+      answerAnchors: [...new Set(content.answers.map(answer =>
+        answer.closest<HTMLElement>('[data-step-process]') ?? answer,
+      ))],
       content,
       id: String(turn),
       questionAnchor,
@@ -401,8 +403,8 @@ export function createShareRuntime(document: Document, options: InstallOptions =
   }
 
   /**
-   * DSH 把思考、工具调用和最终回答渲染为多个兄弟节点。
-   * 因此在共同父容器上建立一个覆盖整段回答的绝对定位区间，
+   * 用过程分组容器与独立回答节点作为布局锚点，内容节点仍用于导出与点击选择。
+   * 在共同父容器上建立一个覆盖整段回答的绝对定位区间，
    * 内层 sticky 按钮才能像官网一样在长回答中吸顶，并在本轮回答末尾被推走。
    */
   const attachAnswerSelectionButton = (
@@ -413,7 +415,7 @@ export function createShareRuntime(document: Document, options: InstallOptions =
     const last = turn.answerAnchors.at(-1)
     const root = first?.parentElement
     if (!first || !last || !root || last.parentElement !== root) return
-    for (const anchor of turn.answerAnchors) attachSelectionContent(turn, anchor, 'answer')
+    for (const content of turn.content.answers) attachSelectionContent(turn, content, 'answer')
     root.dataset.dshShareSelectRangeRoot = ''
     controller.resizeObserver?.observe(root)
     let region = [...root.children].find(child =>

@@ -452,6 +452,56 @@ describe('分享按钮运行时', () => {
     runtime.dispose()
   })
 
+  it.each([false, true])('过程分组展开=%s 时回答选择区域覆盖整轮且与问题联动', (expanded) => {
+    const fixture = createConversation()
+    addTurn(fixture, 'grouped', 1, true)
+    const parts = [...fixture.column.querySelectorAll<HTMLElement>(
+      '[data-chat-flow-kind="assistant-step"], [data-chat-flow-kind="tool-call"]',
+    )]
+    const group = document.createElement('div')
+    group.dataset.stepProcess = ''
+    group.innerHTML = `<button data-process-toggle>过程</button><div data-step-process-body style="height:${expanded ? 'auto' : '0px'};overflow:hidden"><div data-step-process-content></div></div>`
+    parts[0]!.before(group)
+    group.querySelector('[data-step-process-content]')!.append(...parts.slice(0, 2))
+    const response = parts[2]!
+    vi.spyOn(fixture.column, 'getBoundingClientRect').mockReturnValue({ top: 10 } as DOMRect)
+    vi.spyOn(group, 'getBoundingClientRect').mockReturnValue({ top: 50 } as DOMRect)
+    vi.spyOn(response, 'getBoundingClientRect').mockReturnValue({ bottom: 250 } as DOMRect)
+    const runtime = createShareRuntime(document)
+    try {
+      clickHeaderShare(runtime, fixture.source)
+      const pair = fixture.scroll.querySelectorAll<HTMLButtonElement>('[data-dsh-share-turn-select]')
+      const region = fixture.column.querySelector<HTMLElement>(':scope > [data-dsh-share-select-region="answer"]')
+      expect(pair).toHaveLength(2)
+      expect(region?.style.top).toBe('40px')
+      expect(region?.style.height).toBe('200px')
+      expect(fixture.scroll.querySelectorAll('[data-dsh-share-select-content="answer"]')).toHaveLength(3)
+      // 分组开关保持原有交互，不把分组标题当作导出内容或可选正文。
+      const headerClick = new MouseEvent('click', { bubbles: true, cancelable: true })
+      group.querySelector('button')!.dispatchEvent(headerClick)
+      expect(headerClick.defaultPrevented).toBe(false)
+      expect(runtime.selectionFor('session-1').getSnapshot().count).toBe(1)
+      response.querySelector('p')!.click()
+      expect(runtime.selectionFor('session-1').getSnapshot().count).toBe(0)
+      expect([...pair].every(button => button.getAttribute('aria-checked') === 'false')).toBe(true)
+      fixture.column.querySelector<HTMLElement>('[data-chat-flow-kind="user"] p')!.click()
+      expect([...pair].every(button => button.getAttribute('aria-checked') === 'true')).toBe(true)
+      if (expanded) {
+        parts[1]!.click()
+        expect(runtime.selectionFor('session-1').getSnapshot().count).toBe(0)
+        pair[1]!.click()
+        expect(runtime.selectionFor('session-1').getSnapshot().count).toBe(1)
+      }
+      runtime.cancelSelection('session-1')
+      expect(fixture.scroll.querySelector('[data-dsh-share-select-content]')).toBeNull()
+      expect(fixture.scroll.querySelector('[data-dsh-share-select-region]')).toBeNull()
+      expect(fixture.scroll.querySelector('[data-dsh-share-select-range-root]')).toBeNull()
+      expect(group.querySelectorAll('[data-chat-flow-kind]')).toHaveLength(2)
+    } finally {
+      runtime.dispose()
+    }
+  })
+
   it('切换已有问答组时复用快照，不重新深拷贝全部消息 DOM', async () => {
     const fixture = createConversation()
     addTurn(fixture, 'first', 1)
