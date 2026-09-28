@@ -3,6 +3,7 @@
 packages:
   - '.'
 autoInstallPeers: true
+strictPeerDependencies: true
 minimumReleaseAgeExclude:
   - '@deepseek-ai/*'
 nodeLinker: hoisted
