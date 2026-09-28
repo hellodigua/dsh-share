@@ -5,7 +5,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type {} from '@deepseek-ai/dsh-client-ui-chat/client'
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import type {} from '@deepseek-ai/dsh-client-ui-session/client'
-import { IconShareOutline16, Tooltip } from '@deepseek-ai/dsh-client-ui-primitives'
+import { IconShareOutlineRegular, Tooltip } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { InjectFace, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import { createElement, Fragment, type MouseEvent as ReactMouseEvent, type ReactElement } from 'react'
 import { normalizeShareLocale, t } from './i18n.ts'
@@ -51,7 +51,7 @@ export function ShareAction({
         shareRuntime.enterSelection(String(sessionId), event.currentTarget, turn)
       },
     },
-    createElement(IconShareOutline16, { size: 16 }),
+    createElement(IconShareOutlineRegular, { size: 16 }),
   )
   return createElement(Tooltip, { label: strings.shareTooltip, side: 'bottom', children: button })
 }
@@ -70,7 +70,7 @@ export function ShareConversationAction({
       onClick: (event: ReactMouseEvent<HTMLButtonElement>) => {
         shareRuntime.enterSelection(String(sessionId), event.currentTarget)
       },
-    }, createElement(IconShareOutline16, { size: 16 }))
+    }, createElement(IconShareOutlineRegular, { size: 16 }))
   return createElement(Tooltip, { label: strings.shareConversation, side: 'bottom', children: button })
 }
 

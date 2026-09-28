@@ -2,7 +2,7 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Fragment } from 'react'
-import { IconShareOutline16, Tooltip } from '@deepseek-ai/dsh-client-ui-primitives'
+import { IconShareOutlineRegular, Tooltip } from '@deepseek-ai/dsh-client-ui-primitives'
 import {
   apply,
   createShareRuntime,
@@ -219,7 +219,7 @@ describe('分享按钮运行时', () => {
       'aria-label': '将当前问答分享为图片',
     })
     expect(action.props.children.props.children).toMatchObject({
-      type: IconShareOutline16,
+      type: IconShareOutlineRegular,
       props: { size: 16 },
     })
 

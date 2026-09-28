@@ -72,7 +72,7 @@ corepack pnpm verify
 
 ## 兼容性
 
-开发基线为 `@deepseek-ai/dsh 0.1.5-rc.1`，运行时依赖范围为 `^0.1.5-rc.1`。分享入口使用官方 `conversation.chat.assistant-actions` 和 `conversation.session.header.utilities` 插槽，不扫描或修改按钮栏 DOM。多选模式通过 `data-chat-flow-kind` 等稳定的 `data-*` 属性添加选择框，不依赖 CSS Module 生成的类名；DSH 调整对话结构后可能需要同步适配。
+开发基线为 `@deepseek-ai/dsh 0.1.7-rc.2`，运行时依赖范围为 `^0.1.7-rc.2`。分享入口使用官方 `conversation.chat.assistant-actions` 和 `conversation.session.header.utilities` 插槽，不扫描或修改按钮栏 DOM。多选模式通过 `data-chat-flow-kind` 等稳定的 `data-*` 属性添加选择框，不依赖 CSS Module 生成的类名；DSH 调整对话结构后可能需要同步适配。
 
 ## 已知限制
 
