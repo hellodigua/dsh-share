@@ -29,7 +29,8 @@
     "README.md",
     "README.en.md",
     "CHANGELOG.md",
-    "THIRD_PARTY_LICENSES.md"
+    "THIRD_PARTY_LICENSES.md",
+    "locale"
   ],
   "exports": {
     ".": {
@@ -40,7 +41,8 @@
       "types": "./lib/types/client/index.d.ts",
       "default": "./lib/client.js"
     },
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./locale/*.json": "./locale/*.json"
   },
   "scripts": {
     "build": "pnpm run clean && tsdown && tsc -p tsconfig.json",
