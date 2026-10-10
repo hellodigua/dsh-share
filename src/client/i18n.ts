@@ -19,6 +19,11 @@ export interface Translation {
   unselectTurn: string
   loading: string
   copy: string
+  copyPage: string
+  downloadPage: string
+  previousPage: string
+  nextPage: string
+  pageNumber(current: number, total: number): string
   download: string
   downloadMarkdown: string
   downloadMarkdownCompact: string
@@ -61,6 +66,11 @@ export function t(locale: ShareLocale): Translation {
       unselectTurn: '取消选择这组对话',
       loading: '正在生成图片…',
       copy: '复制图片',
+      copyPage: '复制当前页',
+      downloadPage: '下载当前页',
+      previousPage: '上一页',
+      nextPage: '下一页',
+      pageNumber: (current, total) => `第 ${current} / ${total} 张`,
       download: '下载图片',
       downloadMarkdown: '下载 Markdown',
       downloadMarkdownCompact: '下载MD',
@@ -98,6 +108,11 @@ export function t(locale: ShareLocale): Translation {
     unselectTurn: 'Unselect this conversation group',
     loading: 'Generating image…',
     copy: 'Copy image',
+    copyPage: 'Copy current page',
+    downloadPage: 'Download current page',
+    previousPage: 'Previous',
+    nextPage: 'Next',
+    pageNumber: (current, total) => `${current} / ${total}`,
     download: 'Download image',
     downloadMarkdown: 'Download Markdown',
     downloadMarkdownCompact: 'Markdown',

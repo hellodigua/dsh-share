@@ -1,7 +1,7 @@
 import { type ShareLocale } from './i18n.ts';
 import { type ShareSettings } from './settings.ts';
-export type ImageRenderer = (element: HTMLElement) => Promise<Blob>;
-export declare function renderShareImage(element: HTMLElement): Promise<Blob>;
+export type ImageRenderer = (element: HTMLElement) => Promise<Blob | Blob[]>;
+export declare function renderShareImage(element: HTMLElement): Promise<Blob | Blob[]>;
 export declare function downloadMarkdownFile(document: Document, markdown: string): void;
 interface PreviewDialogOptions {
     getLocale(): ShareLocale;
@@ -26,6 +26,13 @@ export declare class PreviewDialog {
     private currentDirectSingleTurn;
     private blob?;
     private objectUrl?;
+    private pages;
+    private pageUrls;
+    private pageIndex;
+    private readonly pager;
+    private readonly previousPage;
+    private readonly nextPage;
+    private readonly pageLabel;
     constructor(document: Document, options: PreviewDialogOptions);
     get settings(): ShareSettings;
     get directSingleTurn(): boolean;
@@ -35,7 +42,8 @@ export declare class PreviewDialog {
     /** 设置连续变化时先保留当前预览，只更新轻量状态；图片稍后统一重算。 */
     showPendingUpdate(): void;
     /** 先在独立 img 中完成解码，再原位替换当前预览，避免出现空白帧。 */
-    showResult(blob: Blob, isCurrent?: () => boolean): Promise<boolean>;
+    showResult(result: Blob | Blob[], isCurrent?: () => boolean): Promise<boolean>;
+    private selectPage;
     showError(preservePreview?: boolean): void;
     private waitForImage;
     private nextFrame;

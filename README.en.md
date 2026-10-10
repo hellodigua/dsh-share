@@ -19,6 +19,7 @@ Adjust the image width, font size, and process visibility before downloading or 
 - Shows linked checkboxes beside both the question and answer, lets you click content to select a group, and supports non-contiguous selection
 - Keeps a checkbox visible while scrolling through long content, then lets it leave at that question or answer's boundary
 - Supports image copy, PNG download, and Markdown download
+- Content taller than 4096 CSS pixels is split into multiple PNGs, with per-page preview, copy, and download. Page boundaries may split text or images.
 - Preserves Markdown, code blocks, tables, images, and tool call summaries
 - Supports adjustable image widths and font sizes, with a scrollable preview for long images
 - Can hide reasoning and tool calls, leaving only the question and final answer

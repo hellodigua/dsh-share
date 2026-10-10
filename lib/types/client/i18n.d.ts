@@ -15,6 +15,11 @@ export interface Translation {
     unselectTurn: string;
     loading: string;
     copy: string;
+    copyPage: string;
+    downloadPage: string;
+    previousPage: string;
+    nextPage: string;
+    pageNumber(current: number, total: number): string;
     download: string;
     downloadMarkdown: string;
     downloadMarkdownCompact: string;
