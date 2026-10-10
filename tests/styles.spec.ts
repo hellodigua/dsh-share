@@ -28,4 +28,12 @@ describe('分享界面主题契约', () => {
     expect(declarations('[data-dsh-share-dialog]::backdrop')).toContain('--dsw-alias-bg-mask-1')
     expect(STYLE_TEXT).toContain('box-shadow: var(--dsw-elevation-prominent,')
   })
+
+  it('选中档位采用配套主题前景背景及高对比兜底，不依赖正文颜色', () => {
+    const choice = declarations('.dsh-share-dialog__choice[aria-pressed="true"]')
+    expect(choice).toContain('background: var(--dsw-alias-button-primary-fill, #111827)')
+    expect(choice).toContain('color: var(--dsw-alias-label-primary-foreground, #fff)')
+    expect(choice).not.toContain('--dsw-alias-interactive-bg-hover')
+    expect(choice).not.toContain('--dsw-alias-label-primary,')
+  })
 })
