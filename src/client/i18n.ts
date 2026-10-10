@@ -22,6 +22,9 @@ export interface Translation {
   copyPage: string
   downloadPage: string
   downloadAll: string
+  downloadAllHint: string
+  zipCreating: string
+  zipFailed: string
   previousPage: string
   nextPage: string
   pageNumber(current: number, total: number): string
@@ -76,6 +79,9 @@ export function t(locale: ShareLocale): Translation {
       copyPage: '复制当前页',
       downloadPage: '下载当前页',
       downloadAll: '下载全部',
+      downloadAllHint: '包含多张图片，将下载为zip',
+      zipCreating: '正在打包全部图片…',
+      zipFailed: '打包失败或内容过大，请重试或下载当前页。',
       previousPage: '上一页',
       nextPage: '下一页',
       pageNumber: (current, total) => `第 ${current} / ${total} 张`,
@@ -125,6 +131,9 @@ export function t(locale: ShareLocale): Translation {
     copyPage: 'Copy current page',
     downloadPage: 'Download current page',
     downloadAll: 'Download all',
+    downloadAllHint: 'Contains multiple images; downloads as a ZIP.',
+    zipCreating: 'Packaging all images…',
+    zipFailed: 'Could not package the images, or the export is too large. Retry or download the current page.',
     previousPage: 'Previous',
     nextPage: 'Next',
     pageNumber: (current, total) => `${current} / ${total}`,

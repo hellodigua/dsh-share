@@ -4,13 +4,16 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { SHARE_DARK_BACKGROUND, SHARE_LIGHT_BACKGROUND } from '../src/client/background.ts'
 
 const toBlob = vi.hoisted(() => vi.fn())
+const createPagesZip = vi.hoisted(() => vi.fn(async () => new Blob(['zip'], { type: 'application/zip' })))
 
 vi.mock('html-to-image', () => ({ toBlob }))
+vi.mock('../src/client/zip.ts', () => ({ createPagesZip }))
 
 afterEach(() => {
   document.body.innerHTML = ''
   document.body.removeAttribute('data-ds-dark-theme')
   toBlob.mockReset()
+  createPagesZip.mockReset().mockResolvedValue(new Blob(['zip'], { type: 'application/zip' }))
   vi.restoreAllMocks()
 })
 
@@ -125,6 +128,7 @@ describe('分享图渲染', () => {
       await dialog.showResult([new Blob(['1']), second])
       expect(downloadAll.hidden).toBe(false)
       expect(downloadAll.textContent).toBe('下载全部')
+      expect(downloadAll.title).toBe('包含多张图片，将下载为zip')
       const next = dialog.element.querySelector<HTMLButtonElement>('[data-dsh-share-next]')!
       expect(next.disabled).toBe(false)
       next.click()
@@ -133,11 +137,12 @@ describe('分享图渲染', () => {
       dialog.element.querySelector<HTMLButtonElement>('[data-dsh-share-download]')!.click()
       expect(downloads[0]).toBe('dsh-对话.png示例-02.png')
       downloadAll.click()
-      expect(downloads.slice(1)).toEqual([
-        'dsh-对话.png示例-01.png',
-        'dsh-对话.png示例-02.png',
-      ])
-      expect(downloadUrls).toEqual(['blob:page-2', 'blob:page-1', 'blob:page-2'])
+      downloadAll.click()
+      expect(downloadAll.disabled).toBe(true)
+      await vi.waitFor(() => expect(downloads.slice(1)).toEqual(['dsh-对话.png示例.zip']))
+      expect(createPagesZip).toHaveBeenCalledOnce()
+      expect(createPagesZip.mock.calls[0]).toEqual([[expect.any(Blob), second], '对话.png示例', expect.any(Date), expect.any(AbortSignal)])
+      expect(downloadUrls).toEqual(['blob:page-2', 'blob:page-3'])
       expect(dialog.element.querySelector('img')!.src).toBe('blob:page-2')
       expect(dialog.element.querySelector('[data-dsh-share-copy]')!.textContent).toBe('复制当前页')
       dialog.element.querySelector<HTMLButtonElement>('[data-dsh-share-copy]')!.click()
@@ -146,9 +151,10 @@ describe('分享图渲染', () => {
       locale = 'en'
       dialog.showPendingUpdate()
       expect(downloadAll.textContent).toBe('Download all')
+      expect(downloadAll.title).toBe('Contains multiple images; downloads as a ZIP.')
       expect(downloadAll.disabled).toBe(true)
       downloadAll.click()
-      expect(downloads).toHaveLength(3)
+      expect(downloads).toHaveLength(2)
       dialog.showError(true)
       expect(downloadAll.disabled).toBe(false)
       dialog.showLoading(2, true)
@@ -156,15 +162,15 @@ describe('分享图渲染', () => {
       await dialog.showResult(new Blob(['3']))
       expect(downloadAll.hidden).toBe(true)
       downloadAll.click()
-      expect(downloads).toHaveLength(3)
+      expect(downloads).toHaveLength(2)
       dialog.element.querySelector<HTMLButtonElement>('[data-dsh-share-download]')!.click()
-      expect(downloads[3]).toBe('dsh-对话.png示例.png')
+      expect(downloads[2]).toBe('dsh-对话.png示例.png')
       expect(revoke).toHaveBeenCalledWith('blob:page-1')
       expect(revoke).toHaveBeenCalledWith('blob:page-2')
       expect(dialog.element.querySelector<HTMLElement>('[data-dsh-share-pages]')!.hidden).toBe(true)
       await dialog.showResult([new Blob(['4']), new Blob(['5'])], () => false)
-      expect(revoke).toHaveBeenCalledWith('blob:page-4')
       expect(revoke).toHaveBeenCalledWith('blob:page-5')
+      expect(revoke).toHaveBeenCalledWith('blob:page-6')
       dialog.showError()
       expect(downloadAll.hidden).toBe(true)
       expect(downloadAll.disabled).toBe(true)
@@ -175,8 +181,63 @@ describe('分享图渲染', () => {
       vi.unstubAllGlobals()
       delete (navigator as Partial<Navigator>).clipboard
     }
-    expect(revoke).toHaveBeenCalledWith('blob:page-3')
+    expect(revoke).toHaveBeenCalledWith('blob:page-4')
   })
+  it.each(['destroy', 'update', 'close'] as const)('打包期间%s会取消下载', async action => {
+    const { PreviewDialog } = await import('../src/client/preview-dialog.ts')
+    let finish!: (blob: Blob) => void
+    createPagesZip.mockImplementationOnce(() => new Promise(resolve => { finish = resolve }))
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
+    vi.stubGlobal('URL', { createObjectURL: () => 'blob:page', revokeObjectURL: vi.fn() })
+    Object.defineProperty(HTMLImageElement.prototype, 'decode', { configurable: true, value: async () => {} })
+    const dialog = new PreviewDialog(document, { getLocale: () => 'zh', onSettingsChange() {}, onDismiss() {} })
+    try {
+      await dialog.showResult([new Blob(['1']), new Blob(['2'])])
+      dialog.element.querySelector<HTMLButtonElement>('[data-dsh-share-download-all]')!.click()
+      if (action === 'destroy') dialog.destroy()
+      else if (action === 'update') dialog.showPendingUpdate()
+      else dialog.element.dispatchEvent(new Event('close'))
+      expect((createPagesZip.mock.calls[0] as unknown as [unknown, unknown, unknown, AbortSignal])[3].aborted).toBe(true)
+      finish(new Blob(['zip']))
+      await new Promise(resolve => setTimeout(resolve, 0))
+      expect(click).not.toHaveBeenCalled()
+    } finally {
+      dialog.destroy()
+      delete (HTMLImageElement.prototype as Partial<HTMLImageElement>).decode
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it('打包失败显示提示并允许重试；ZIP 下载只触发一次且延迟释放', async () => {
+    const { PreviewDialog } = await import('../src/client/preview-dialog.ts')
+    createPagesZip.mockRejectedValueOnce(new Error('read failed'))
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
+    const revoke = vi.fn()
+    vi.stubGlobal('URL', { createObjectURL: () => 'blob:zip-test', revokeObjectURL: revoke })
+    Object.defineProperty(HTMLImageElement.prototype, 'decode', { configurable: true, value: async () => {} })
+    const dialog = new PreviewDialog(document, { getLocale: () => 'zh', onSettingsChange() {}, onDismiss() {} })
+    try {
+      await dialog.showResult([new Blob(['1']), new Blob(['2'])])
+      const button = dialog.element.querySelector<HTMLButtonElement>('[data-dsh-share-download-all]')!
+      button.click()
+      await vi.waitFor(() => expect(dialog.element.textContent).toContain('打包失败'))
+      expect(button.disabled).toBe(false)
+      expect(click).not.toHaveBeenCalled()
+      vi.useFakeTimers()
+      button.click()
+      await Promise.resolve()
+      expect(click).toHaveBeenCalledOnce()
+      expect(revoke).not.toHaveBeenCalled()
+      await vi.advanceTimersByTimeAsync(60000)
+      expect(revoke).toHaveBeenCalledWith('blob:zip-test')
+    } finally {
+      vi.useRealTimers()
+      dialog.destroy()
+      delete (HTMLImageElement.prototype as Partial<HTMLImageElement>).decode
+      vi.unstubAllGlobals()
+    }
+  })
+
   it('把透明计算底色换成不透明颜色再交给 html-to-image', async () => {
     toBlob.mockResolvedValue(new Blob(['png'], { type: 'image/png' }))
     const { renderShareImage } = await import('../src/client/preview-dialog.ts')

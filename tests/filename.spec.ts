@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { createDownloadFilename } from '../src/client/filename.ts'
 
 describe('下载文件名', () => {
-  it.each(['md', 'html', 'png'] as const)('使用中文与英文标题：%s', extension => {
+  it.each(['md', 'html', 'png', 'zip'] as const)('使用中文与英文标题：%s', extension => {
     expect(createDownloadFilename(extension, '中文 title 😀')).toBe(`dsh-中文 title 😀.${extension}`)
   })
   it('清理非法字符、控制字符、首尾点与空白', () => {

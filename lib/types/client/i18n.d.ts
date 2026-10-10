@@ -18,6 +18,9 @@ export interface Translation {
     copyPage: string;
     downloadPage: string;
     downloadAll: string;
+    downloadAllHint: string;
+    zipCreating: string;
+    zipFailed: string;
     previousPage: string;
     nextPage: string;
     pageNumber(current: number, total: number): string;

@@ -1,5 +1,5 @@
 /** 清理跨平台文件名，并为缺少标题的会话生成时间兜底。 */
-export function createDownloadFilename(extension: 'png' | 'md' | 'html', title?: string, page?: number, now = new Date()): string {
+export function createDownloadFilename(extension: 'png' | 'md' | 'html' | 'zip', title?: string, page?: number, now = new Date()): string {
   const clean = (title ?? '').normalize('NFC')
     .replace(/[<>:"/\\|?*\u0000-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/g, ' ')
     .replace(/\s+/g, ' ').trim().replace(/^[. ]+|[. ]+$/g, '')

@@ -1,5 +1,6 @@
 import { toBlob } from 'html-to-image'
 import { createDownloadFilename } from './filename.ts'
+import { createPagesZip } from './zip.ts'
 import { shareExportBackground } from './background.ts'
 import { t, type ShareLocale, type Translation } from './i18n.ts'
 import { createSharePages } from './pagination.ts'
@@ -110,6 +111,7 @@ export class PreviewDialog {
   private pages: Blob[] = []
   private pageUrls: string[] = []
   private pageIndex = 0
+  private archiveJob?: AbortController
   private readonly pager: HTMLElement
   private readonly previousPage: HTMLButtonElement
   private readonly nextPage: HTMLButtonElement
@@ -228,6 +230,7 @@ export class PreviewDialog {
     this.copyButton.textContent = strings.copy
     this.downloadButton.textContent = strings.download
     this.downloadAllButton.textContent = strings.downloadAll
+    this.downloadAllButton.title = strings.downloadAllHint
 
     close.addEventListener('click', () => this.close())
     dialog.addEventListener('click', (event) => {
@@ -239,7 +242,7 @@ export class PreviewDialog {
     })
     this.copyButton.addEventListener('click', () => void this.copy())
     this.downloadButton.addEventListener('click', () => this.download())
-    this.downloadAllButton.addEventListener('click', () => this.downloadAll())
+    this.downloadAllButton.addEventListener('click', () => void this.downloadAll())
     this.directSingleTurnInput.addEventListener('change', () => {
       this.currentDirectSingleTurn = this.directSingleTurnInput.checked
       saveDirectSingleTurn(this.storage, this.currentDirectSingleTurn)
@@ -298,6 +301,7 @@ export class PreviewDialog {
     this.copyButton.textContent = strings.copy
     this.downloadButton.textContent = strings.download
     this.downloadAllButton.textContent = strings.downloadAll
+    this.downloadAllButton.title = strings.downloadAllHint
     if (this.pages.length) this.selectPage(this.pageIndex)
     return strings
   }
@@ -307,6 +311,7 @@ export class PreviewDialog {
     preservePreview = false,
     selectionExport = false,
   ): void {
+    this.cancelArchive()
     const strings = this.updateCopy()
     const canPreserve = preservePreview && this.blob !== undefined && this.objectUrl !== undefined
     this.title.textContent = selectionExport ? strings.selectedTitle(turnCount) : strings.title
@@ -333,6 +338,7 @@ export class PreviewDialog {
 
   /** 设置连续变化时先保留当前预览，只更新轻量状态；图片稍后统一重算。 */
   showPendingUpdate(): void {
+    this.cancelArchive()
     const strings = this.updateCopy()
     const canPreserve = this.blob !== undefined && this.objectUrl !== undefined
     this.element.ariaBusy = 'true'
@@ -376,6 +382,7 @@ export class PreviewDialog {
       throw error
     }
 
+    this.cancelArchive()
     const previousUrls = this.pageUrls
     this.pages = pages
     this.pageUrls = urls
@@ -512,6 +519,7 @@ export class PreviewDialog {
   }
 
   private clearImageResult(): void {
+    this.cancelArchive()
     this.blob = undefined
     this.pageUrls.forEach(url => URL.revokeObjectURL(url))
     this.pageUrls = []
@@ -552,17 +560,42 @@ export class PreviewDialog {
     anchor.click()
   }
 
-  /** 使用同一时间戳按页序下载，不改变当前预览页。 */
-  private downloadAll(): void {
-    if (this.downloadAllButton.disabled || this.pageUrls.length < 2) return
+  private cancelArchive(): void {
+    this.archiveJob?.abort()
+    this.archiveJob = undefined
+  }
+
+  /** 一次保存全部分页，避免多次自动下载被宿主丢弃。 */
+  private async downloadAll(): Promise<void> {
+    if (this.downloadAllButton.disabled || this.pages.length < 2 || this.archiveJob) return
+    const job = new AbortController()
+    this.archiveJob = job
+    const pages = [...this.pages]
     const title = this.options.getConversationTitle?.()
     const now = new Date()
-    this.pageUrls.forEach((url, index) => {
+    this.downloadAllButton.disabled = true
+    this.status.textContent = t(this.options.getLocale()).zipCreating
+    try {
+      const blob = await createPagesZip(pages, title, now, job.signal)
+      if (job.signal.aborted || !this.element.isConnected) return
+      const url = URL.createObjectURL(blob)
       const anchor = this.document.createElement('a')
       anchor.href = url
-      anchor.download = createDownloadFilename('png', title, index + 1, now)
-      anchor.click()
-    })
+      anchor.download = createDownloadFilename('zip', title, undefined, now)
+      try {
+        anchor.click()
+      } finally {
+        this.document.defaultView?.setTimeout(() => URL.revokeObjectURL(url), 60000)
+      }
+      this.status.textContent = ''
+    } catch {
+      if (!job.signal.aborted) this.status.textContent = t(this.options.getLocale()).zipFailed
+    } finally {
+      if (this.archiveJob === job) {
+        this.archiveJob = undefined
+        this.downloadAllButton.disabled = this.pages.length < 2 || this.element.ariaBusy === 'true'
+      }
+    }
   }
 
 }

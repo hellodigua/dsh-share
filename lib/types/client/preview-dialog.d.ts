@@ -33,6 +33,7 @@ export declare class PreviewDialog {
     private pages;
     private pageUrls;
     private pageIndex;
+    private archiveJob?;
     private readonly pager;
     private readonly previousPage;
     private readonly nextPage;
@@ -60,7 +61,8 @@ export declare class PreviewDialog {
     private clearImageResult;
     private copy;
     private download;
-    /** 使用同一时间戳按页序下载，不改变当前预览页。 */
+    private cancelArchive;
+    /** 一次保存全部分页，避免多次自动下载被宿主丢弃。 */
     private downloadAll;
 }
 export {};
