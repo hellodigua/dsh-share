@@ -15,17 +15,45 @@ import {
 const TRANSPARENT_IMAGE_PLACEHOLDER =
   'data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs='
 
-export type ImageRenderer = (element: HTMLElement) => Promise<Blob>
+export type ImageRenderer = (element: HTMLElement) => Promise<Blob | Blob[]>
 
-export async function renderShareImage(element: HTMLElement): Promise<Blob> {
-  const blob = await toBlob(element, {
+export async function renderShareImage(element: HTMLElement): Promise<Blob | Blob[]> {
+  const options = {
     backgroundColor: shareExportBackground(element),
     imagePlaceholder: TRANSPARENT_IMAGE_PLACEHOLDER,
     pixelRatio: 2,
     skipFonts: true,
-  })
-  if (!blob) throw new Error('html-to-image returned an empty blob')
-  return blob
+    skipAutoScale: true,
+  }
+  const height = Math.ceil(element.getBoundingClientRect().height)
+  const width = Math.ceil(element.getBoundingClientRect().width)
+  // 每页限制画布高度及面积，避免超长图自动缩小或超大画布编码失败。
+  const pageHeight = 4096
+  if (height <= pageHeight) {
+    const blob = await toBlob(element, options)
+    if (!blob) throw new Error('html-to-image returned an empty blob')
+    return blob
+  }
+  const viewport = element.ownerDocument.createElement('div')
+  Object.assign(viewport.style, { width: `${width}px`, overflow: 'hidden', position: 'relative' })
+  const copy = element.cloneNode(true) as HTMLElement
+  Object.assign(copy.style, { margin: '0', width: `${width}px`, transformOrigin: 'top left' })
+  viewport.append(copy)
+  element.after(viewport)
+  const pages: Blob[] = []
+  try {
+    for (let offset = 0; offset < height; offset += pageHeight) {
+      const sliceHeight = Math.min(pageHeight, height - offset)
+      viewport.style.height = `${sliceHeight}px`
+      copy.style.transform = `translateY(-${offset}px)`
+      const blob = await toBlob(viewport, { ...options, width, height: sliceHeight })
+      if (!blob) throw new Error('html-to-image returned an empty page')
+      pages.push(blob)
+    }
+    return pages
+  } finally {
+    viewport.remove()
+  }
 }
 
 function createFilename(extension: 'png' | 'md', now = new Date()): string {
@@ -65,6 +93,13 @@ export class PreviewDialog {
   private currentDirectSingleTurn: boolean
   private blob?: Blob
   private objectUrl?: string
+  private pages: Blob[] = []
+  private pageUrls: string[] = []
+  private pageIndex = 0
+  private readonly pager: HTMLElement
+  private readonly previousPage: HTMLButtonElement
+  private readonly nextPage: HTMLButtonElement
+  private readonly pageLabel: HTMLElement
 
   constructor(
     private readonly document: Document,
@@ -113,6 +148,11 @@ export class PreviewDialog {
         <img class="dsh-share-dialog__preview" data-dsh-share-preview hidden alt="" />
       </div>
       <div class="dsh-share-dialog__footer">
+        <span data-dsh-share-pages hidden>
+          <button class="dsh-share-dialog__action" data-dsh-share-prev type="button"></button>
+          <span data-dsh-share-page-label aria-live="polite"></span>
+          <button class="dsh-share-dialog__action" data-dsh-share-next type="button"></button>
+        </span>
         <span class="dsh-share-dialog__status" data-dsh-share-status role="status"></span>
         <button class="dsh-share-dialog__action" data-dsh-share-download type="button"></button>
         <button class="dsh-share-dialog__action dsh-share-dialog__action--primary" data-dsh-share-copy type="button"></button>
@@ -123,6 +163,12 @@ export class PreviewDialog {
     this.image = dialog.querySelector('[data-dsh-share-preview]') as HTMLImageElement
     this.message = dialog.querySelector('[data-dsh-share-message]') as HTMLElement
     this.status = dialog.querySelector('[data-dsh-share-status]') as HTMLElement
+    this.pager = dialog.querySelector('[data-dsh-share-pages]') as HTMLElement
+    this.previousPage = dialog.querySelector('[data-dsh-share-prev]') as HTMLButtonElement
+    this.nextPage = dialog.querySelector('[data-dsh-share-next]') as HTMLButtonElement
+    this.pageLabel = dialog.querySelector('[data-dsh-share-page-label]') as HTMLElement
+    this.previousPage.addEventListener('click', () => this.selectPage(this.pageIndex - 1))
+    this.nextPage.addEventListener('click', () => this.selectPage(this.pageIndex + 1))
     this.copyButton = dialog.querySelector('[data-dsh-share-copy]') as HTMLButtonElement
     this.downloadButton = dialog.querySelector('[data-dsh-share-download]') as HTMLButtonElement
     this.directSingleTurnInput = dialog.querySelector('[data-dsh-share-direct-single-turn]') as HTMLInputElement
@@ -233,6 +279,7 @@ export class PreviewDialog {
     }
     this.copyButton.textContent = strings.copy
     this.downloadButton.textContent = strings.download
+    if (this.pages.length) this.selectPage(this.pageIndex)
     return strings
   }
 
@@ -285,27 +332,33 @@ export class PreviewDialog {
   }
 
   /** 先在独立 img 中完成解码，再原位替换当前预览，避免出现空白帧。 */
-  async showResult(blob: Blob, isCurrent: () => boolean = () => true): Promise<boolean> {
-    const nextObjectUrl = URL.createObjectURL(blob)
+  async showResult(result: Blob | Blob[], isCurrent: () => boolean = () => true): Promise<boolean> {
+    const pages = Array.isArray(result) ? result : [result]
+    if (!pages.length) throw new Error('No image pages')
+    const urls: string[] = []
     try {
-      const preloader = this.document.createElement('img')
-      preloader.src = nextObjectUrl
-      if (typeof preloader.decode === 'function') await preloader.decode()
-      else await this.waitForImage(preloader)
+      for (const blob of pages) {
+        const nextObjectUrl = URL.createObjectURL(blob)
+        urls.push(nextObjectUrl)
+        const preloader = this.document.createElement('img')
+        preloader.src = nextObjectUrl
+        if (typeof preloader.decode === 'function') await preloader.decode()
+        else await this.waitForImage(preloader)
+      }
 
       if (!isCurrent()) {
-        URL.revokeObjectURL(nextObjectUrl)
+        urls.forEach(url => URL.revokeObjectURL(url))
         return false
       }
     } catch (error) {
-      URL.revokeObjectURL(nextObjectUrl)
+      urls.forEach(url => URL.revokeObjectURL(url))
       throw error
     }
 
-    const previousObjectUrl = this.objectUrl
-    this.blob = blob
-    this.objectUrl = nextObjectUrl
-    this.image.src = nextObjectUrl
+    const previousUrls = this.pageUrls
+    this.pages = pages
+    this.pageUrls = urls
+    this.selectPage(0)
     this.image.style.width = `${WIDTH_PRESETS[this.currentSettings.width]}px`
     this.image.hidden = false
     this.message.hidden = true
@@ -316,8 +369,26 @@ export class PreviewDialog {
 
     // 新图已进入解码缓存；延后一帧释放旧 URL，保证浏览器完成原位绘制。
     await this.nextFrame()
-    if (previousObjectUrl) URL.revokeObjectURL(previousObjectUrl)
+    previousUrls.forEach(url => URL.revokeObjectURL(url))
     return true
+  }
+
+  private selectPage(index: number): void {
+    if (index < 0 || index >= this.pages.length) return
+    this.pageIndex = index
+    this.blob = this.pages[index]
+    this.objectUrl = this.pageUrls[index]
+    this.image.src = this.objectUrl!
+    this.status.textContent = ''
+    const strings = t(this.options.getLocale())
+    this.pager.hidden = this.pages.length <= 1
+    this.previousPage.textContent = strings.previousPage
+    this.nextPage.textContent = strings.nextPage
+    this.previousPage.disabled = index === 0
+    this.nextPage.disabled = index === this.pages.length - 1
+    this.pageLabel.textContent = strings.pageNumber(index + 1, this.pages.length)
+    this.copyButton.textContent = this.pages.length > 1 ? strings.copyPage : strings.copy
+    this.downloadButton.textContent = this.pages.length > 1 ? strings.downloadPage : strings.download
   }
 
   showError(preservePreview = false): void {
@@ -417,7 +488,10 @@ export class PreviewDialog {
 
   private clearImageResult(): void {
     this.blob = undefined
-    if (this.objectUrl) URL.revokeObjectURL(this.objectUrl)
+    this.pageUrls.forEach(url => URL.revokeObjectURL(url))
+    this.pageUrls = []
+    this.pages = []
+    this.pager.hidden = true
     this.objectUrl = undefined
     this.image.removeAttribute('src')
     this.status.textContent = ''
@@ -447,7 +521,9 @@ export class PreviewDialog {
     if (!this.objectUrl) return
     const anchor = this.document.createElement('a')
     anchor.href = this.objectUrl
-    anchor.download = createFilename('png')
+    anchor.download = this.pages.length > 1
+      ? createFilename('png').replace('.png', `-${this.pageIndex + 1}-of-${this.pages.length}.png`)
+      : createFilename('png')
     anchor.click()
   }
 

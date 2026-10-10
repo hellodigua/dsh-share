@@ -5,6 +5,15 @@ import { SHARE_DARK_BACKGROUND, SHARE_LIGHT_BACKGROUND } from '../src/client/bac
 import { createShareCard } from '../src/client/card.ts'
 import type { ShareMessage } from '../src/client/content.ts'
 
+it.each([false, true])('fallback HARNESS 徽标前景背景分离，暗色=%s', (dark) => {
+  document.body.toggleAttribute('data-ds-dark-theme', dark)
+  const card = createShareCard(document, [], 'zh')
+  const badge = card.element.querySelector<HTMLElement>('[data-dsh-share-badge]')!
+  expect(badge.style.color).toBe('rgb(255, 255, 255)')
+  expect(badge.style.background).toBe('rgb(17, 24, 39)')
+  card.dispose()
+})
+
 function pair(
   prompt: HTMLElement,
   answers: HTMLElement[],

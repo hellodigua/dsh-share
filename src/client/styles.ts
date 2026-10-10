@@ -403,6 +403,7 @@ div:has([data-dsh-share-button]) > span { order: 2; }
   text-align: center;
 }
 .dsh-share-dialog__footer {
+  flex-wrap: wrap;
   align-items: center;
   border-top: 1px solid var(--dsw-alias-line-border, rgba(127, 127, 127, .18));
   display: flex;
@@ -411,6 +412,7 @@ div:has([data-dsh-share-button]) > span { order: 2; }
   min-height: 68px;
   padding: 14px 18px;
 }
+[data-dsh-share-pages]:not([hidden]) { display: flex; align-items: center; gap: 8px; }
 .dsh-share-dialog__status { color: var(--dsw-alias-label-secondary, #6b7280); font-size: 13px; margin-right: auto; }
 .dsh-share-dialog__action {
   background: transparent;
