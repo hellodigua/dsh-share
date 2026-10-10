@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { SHARE_DARK_BACKGROUND, SHARE_LIGHT_BACKGROUND } from '../src/client/background.ts'
 import { createShareCard } from '../src/client/card.ts'
 import type { ShareMessage } from '../src/client/content.ts'
+import { STYLE_TEXT } from '../src/client/styles.ts'
 
 it.each([false, true])('fallback HARNESS 徽标前景背景分离，暗色=%s', (dark) => {
   document.body.toggleAttribute('data-ds-dark-theme', dark)
@@ -31,6 +32,38 @@ afterEach(() => {
 })
 
 describe('分享图片卡片', () => {
+  it('导出表格约束换行和单元格宽度，解除固定行高且不修改源表格', () => {
+    const style = document.createElement('style')
+    style.textContent = '.host-table :is(th, td, tr) { white-space: nowrap; height: 480px; }\n' + STYLE_TEXT
+    document.head.append(style)
+    const source = document.createElement('div')
+    source.innerHTML = '<table class="host-table"><thead><tr><th>内容</th></tr></thead><tbody><tr><td>长文本WithoutSpaces</td></tr></tbody></table>'
+    document.body.append(source)
+    const card = createShareCard(document, [{ role: 'assistant', turn: 1, order: 1, omittedBefore: 0, elements: [source] }], 'zh')
+    try {
+      expect(getComputedStyle(source.querySelector('td')!).whiteSpace).toBe('nowrap')
+      const table = card.element.querySelector('table')!
+      expect(getComputedStyle(table).borderCollapse).toBe('collapse')
+      expect(getComputedStyle(table).tableLayout).toBe('fixed')
+      for (const cell of table.querySelectorAll('th, td')) {
+        const computed = getComputedStyle(cell)
+        expect(computed.maxWidth).toBe('100%')
+        expect(computed.whiteSpace).toBe('normal')
+        expect(computed.height).toBe('auto')
+        expect(computed.verticalAlign).toBe('top')
+        expect(computed.overflowWrap).toBe('anywhere')
+      }
+      for (const row of table.rows) expect(getComputedStyle(row).height).toBe('auto')
+      const pageCopy = card.element.cloneNode(true) as HTMLElement
+      card.element.after(pageCopy)
+      expect(getComputedStyle(pageCopy.querySelector('td')!).whiteSpace).toBe('normal')
+      pageCopy.remove()
+    } finally {
+      card.dispose()
+      style.remove()
+    }
+  })
+
   it('按用户消息和回答消息分别克隆内容，并移除原消息操作按钮', () => {
     const prompt = document.createElement('div')
     prompt.innerHTML = '<div data-time-hover-root><p>测试问题</p><div><button>复制</button></div></div>'
