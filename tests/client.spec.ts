@@ -641,7 +641,8 @@ describe('分享按钮运行时', () => {
     expect(document.querySelector('[data-dsh-share-title]')?.textContent).toBe('生成图片')
     const dialogFooter = document.querySelector('.dsh-share-dialog__footer') as HTMLElement
     expect(dialogFooter.querySelector('[data-dsh-share-download-markdown]')).toBeNull()
-    expect(dialogFooter.querySelectorAll(':scope > button')).toHaveLength(2)
+    expect(dialogFooter.querySelectorAll(':scope > button:not([hidden])')).toHaveLength(2)
+    expect(dialogFooter.querySelector<HTMLElement>('[data-dsh-share-download-all]')!.hidden).toBe(true)
     expect(dialogFooter.querySelector<HTMLElement>('[data-dsh-share-pages]')?.hidden).toBe(true)
     expect(dialogFooter.querySelector('[data-dsh-share-download]')?.textContent).toBe('下载图片')
     expect(dialogFooter.querySelector('[data-dsh-share-copy]')).not.toBeNull()

@@ -21,6 +21,7 @@ export interface Translation {
   copy: string
   copyPage: string
   downloadPage: string
+  downloadAll: string
   previousPage: string
   nextPage: string
   pageNumber(current: number, total: number): string
@@ -68,6 +69,7 @@ export function t(locale: ShareLocale): Translation {
       copy: '复制图片',
       copyPage: '复制当前页',
       downloadPage: '下载当前页',
+      downloadAll: '下载全部',
       previousPage: '上一页',
       nextPage: '下一页',
       pageNumber: (current, total) => `第 ${current} / ${total} 张`,
@@ -77,9 +79,9 @@ export function t(locale: ShareLocale): Translation {
       copied: '图片已复制',
       copyUnsupported: '当前浏览器不支持复制图片，请下载 PNG。',
       copyFailed: '复制失败，请下载 PNG。',
-      renderFailed: '图片生成失败，请稍后重试。',
+      renderFailed: '无法完整生成图片，请减小字号、减少内容或导出 Markdown。',
       updating: '正在更新预览…',
-      updateFailed: '更新失败，当前仍为上一张预览。',
+      updateFailed: '无法完整生成新图片，仍显示上次预览。请减小字号或减少内容。',
       close: '关闭',
       width: '宽度',
       fontSize: '字号',
@@ -110,6 +112,7 @@ export function t(locale: ShareLocale): Translation {
     copy: 'Copy image',
     copyPage: 'Copy current page',
     downloadPage: 'Download current page',
+    downloadAll: 'Download all',
     previousPage: 'Previous',
     nextPage: 'Next',
     pageNumber: (current, total) => `${current} / ${total}`,
@@ -119,9 +122,9 @@ export function t(locale: ShareLocale): Translation {
     copied: 'Image copied',
     copyUnsupported: 'Image clipboard is unavailable. Please download the PNG.',
     copyFailed: 'Could not copy the image. Please download the PNG.',
-    renderFailed: 'Could not generate the image. Please try again.',
+    renderFailed: 'Could not generate the complete image. Reduce the font size or content, or export Markdown.',
     updating: 'Updating preview…',
-    updateFailed: 'Update failed. The previous preview is still shown.',
+    updateFailed: 'Could not generate the complete image. The previous preview is still shown. Reduce the font size or content.',
     close: 'Close',
     width: 'Width',
     fontSize: 'Size',
