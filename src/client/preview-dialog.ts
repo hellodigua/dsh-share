@@ -1,4 +1,5 @@
 import { toBlob } from 'html-to-image'
+import { createDownloadFilename } from './filename.ts'
 import { shareExportBackground } from './background.ts'
 import { t, type ShareLocale, type Translation } from './i18n.ts'
 import { createSharePages } from './pagination.ts'
@@ -62,22 +63,28 @@ export async function renderShareImage(element: HTMLElement): Promise<Blob | Blo
   }
 }
 
-function createFilename(extension: 'png' | 'md', now = new Date()): string {
-  const pad = (number: number): string => String(number).padStart(2, '0')
-  return `dsh-${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}.${extension}`
-}
-
-export function downloadMarkdownFile(document: Document, markdown: string): void {
+export function downloadMarkdownFile(document: Document, markdown: string, title?: string): void {
   if (!markdown) return
   const objectUrl = URL.createObjectURL(new Blob([markdown], { type: 'text/markdown;charset=utf-8' }))
   const anchor = document.createElement('a')
   anchor.href = objectUrl
-  anchor.download = createFilename('md')
+  anchor.download = createDownloadFilename('md', title)
   anchor.click()
   document.defaultView?.setTimeout(() => URL.revokeObjectURL(objectUrl), 0)
 }
 
+/** 下载独立HTML文档，给宿主留出读取Blob的时间。 */
+export function downloadHtmlFile(document: Document, html: string, title?: string): void {
+  const url = URL.createObjectURL(new Blob([html], { type: 'text/html;charset=utf-8' }))
+  const anchor = document.createElement('a')
+  anchor.href = url
+  anchor.download = createDownloadFilename('html', title)
+  anchor.click()
+  document.defaultView?.setTimeout(() => URL.revokeObjectURL(url), 60000)
+}
+
 interface PreviewDialogOptions {
+  getConversationTitle?(): string | undefined
   getLocale(): ShareLocale
   onSettingsChange(settings: ShareSettings): void
   onDismiss(): void
@@ -541,20 +548,19 @@ export class PreviewDialog {
     if (!this.objectUrl) return
     const anchor = this.document.createElement('a')
     anchor.href = this.objectUrl
-    anchor.download = this.pages.length > 1
-      ? createFilename('png').replace('.png', `-${this.pageIndex + 1}-of-${this.pages.length}.png`)
-      : createFilename('png')
+    anchor.download = createDownloadFilename('png', this.options.getConversationTitle?.(), this.pages.length > 1 ? this.pageIndex + 1 : undefined)
     anchor.click()
   }
 
   /** 使用同一时间戳按页序下载，不改变当前预览页。 */
   private downloadAll(): void {
     if (this.downloadAllButton.disabled || this.pageUrls.length < 2) return
-    const filename = createFilename('png')
+    const title = this.options.getConversationTitle?.()
+    const now = new Date()
     this.pageUrls.forEach((url, index) => {
       const anchor = this.document.createElement('a')
       anchor.href = url
-      anchor.download = filename.replace('.png', `-${index + 1}-of-${this.pageUrls.length}.png`)
+      anchor.download = createDownloadFilename('png', title, index + 1, now)
       anchor.click()
     })
   }

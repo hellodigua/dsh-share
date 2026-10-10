@@ -2,8 +2,11 @@ import { type ShareLocale } from './i18n.ts';
 import { type ShareSettings } from './settings.ts';
 export type ImageRenderer = (element: HTMLElement) => Promise<Blob | Blob[]>;
 export declare function renderShareImage(element: HTMLElement): Promise<Blob | Blob[]>;
-export declare function downloadMarkdownFile(document: Document, markdown: string): void;
+export declare function downloadMarkdownFile(document: Document, markdown: string, title?: string): void;
+/** 下载独立HTML文档，给宿主留出读取Blob的时间。 */
+export declare function downloadHtmlFile(document: Document, html: string, title?: string): void;
 interface PreviewDialogOptions {
+    getConversationTitle?(): string | undefined;
     getLocale(): ShareLocale;
     onSettingsChange(settings: ShareSettings): void;
     onDismiss(): void;

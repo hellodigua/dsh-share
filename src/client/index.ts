@@ -36,8 +36,9 @@ export type ShareConversationActionProps =
 
 /** 官方 assistant-actions 插槽中的分享入口。 */
 export function ShareAction({
-  sessionId, shareRuntime, useShareLocale,
+  sessionId, shareRuntime, useShareLocale, useSessions,
 }: ShareActionProps): ReactElement {
+  const conversationTitle = useSessions(snapshot => snapshot.byId[sessionId]?.title)
   const strings = t(normalizeShareLocale(useShareLocale(snapshot => snapshot.active)))
   const button = createElement('button',
     {
@@ -50,7 +51,7 @@ export function ShareAction({
         if (turnValue === undefined || !Number.isFinite(turn)) return
         // Pointer activation must not become the dialog's focus-return target.
         if (event.detail > 0) event.currentTarget.blur()
-        shareRuntime.enterSelection(String(sessionId), event.currentTarget, turn)
+        shareRuntime.enterSelection(String(sessionId), event.currentTarget, turn, conversationTitle)
       },
     },
     createElement(IconShareOutlineRegular, { size: 16 }),
@@ -60,8 +61,9 @@ export function ShareAction({
 
 /** 官方 Session Header 右侧 utilities 插槽中的多轮分享入口。 */
 export function ShareConversationAction({
-  sessionId, shareRuntime, useShareLocale, useShareSelection,
+  sessionId, shareRuntime, useShareLocale, useShareSelection, useSessions,
 }: ShareConversationActionProps): ReactElement {
+  const conversationTitle = useSessions(snapshot => snapshot.byId[sessionId]?.title)
   const strings = t(normalizeShareLocale(useShareLocale(snapshot => snapshot.active)))
   const selectionActive = useShareSelection(snapshot => snapshot.active)
   if (selectionActive) return createElement(Fragment)
@@ -71,7 +73,7 @@ export function ShareConversationAction({
       'aria-label': strings.shareConversation,
       onClick: (event: ReactMouseEvent<HTMLButtonElement>) => {
         if (event.detail > 0) event.currentTarget.blur()
-        shareRuntime.enterSelection(String(sessionId), event.currentTarget)
+        shareRuntime.enterSelection(String(sessionId), event.currentTarget, undefined, conversationTitle)
       },
     }, createElement(IconShareOutlineRegular, { size: 16 }))
   return createElement(Tooltip, { label: strings.shareConversation, side: 'bottom', children: button })

@@ -116,7 +116,7 @@ describe('分享图渲染', () => {
       downloadUrls.push(this.href)
     })
     let locale: 'zh' | 'en' = 'zh'
-    const dialog = new PreviewDialog(document, { getLocale: () => locale, onSettingsChange() {}, onDismiss() {} })
+    const dialog = new PreviewDialog(document, { getLocale: () => locale, getConversationTitle: () => '对话.png示例', onSettingsChange() {}, onDismiss() {} })
     try {
       const downloadAll = dialog.element.querySelector<HTMLButtonElement>('[data-dsh-share-download-all]')!
       expect(downloadAll.hidden).toBe(true)
@@ -131,11 +131,11 @@ describe('分享图渲染', () => {
       expect(next.disabled).toBe(true)
       expect(dialog.element.querySelector('img')!.src).toBe('blob:page-2')
       dialog.element.querySelector<HTMLButtonElement>('[data-dsh-share-download]')!.click()
-      expect(downloads[0]).toMatch(/^dsh-\d{8}-\d{6}-2-of-2\.png$/)
+      expect(downloads[0]).toBe('dsh-对话.png示例-02.png')
       downloadAll.click()
       expect(downloads.slice(1)).toEqual([
-        expect.stringMatching(/^dsh-\d{8}-\d{6}-1-of-2\.png$/),
-        downloads[1]!.replace('-1-of-2.png', '-2-of-2.png'),
+        'dsh-对话.png示例-01.png',
+        'dsh-对话.png示例-02.png',
       ])
       expect(downloadUrls).toEqual(['blob:page-2', 'blob:page-1', 'blob:page-2'])
       expect(dialog.element.querySelector('img')!.src).toBe('blob:page-2')
@@ -158,7 +158,7 @@ describe('分享图渲染', () => {
       downloadAll.click()
       expect(downloads).toHaveLength(3)
       dialog.element.querySelector<HTMLButtonElement>('[data-dsh-share-download]')!.click()
-      expect(downloads[3]).toMatch(/^dsh-\d{8}-\d{6}\.png$/)
+      expect(downloads[3]).toBe('dsh-对话.png示例.png')
       expect(revoke).toHaveBeenCalledWith('blob:page-1')
       expect(revoke).toHaveBeenCalledWith('blob:page-2')
       expect(dialog.element.querySelector<HTMLElement>('[data-dsh-share-pages]')!.hidden).toBe(true)
