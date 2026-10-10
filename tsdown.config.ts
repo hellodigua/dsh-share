@@ -26,7 +26,7 @@ export default defineConfig([
     clean: false,
     deps: {
       onlyBundle: ['html-to-image', 'turndown', 'turndown-plugin-gfm'],
-      neverBundle: ['react', '@deepseek-ai/dsh-client-ui-primitives', '@mixmark-io/domino'],
+      neverBundle: ['react', 'react-dom', 'react-dom/client', '@deepseek-ai/dsh-client-ui-primitives', '@mixmark-io/domino'],
     },
     outputOptions: {
       entryFileNames: 'client.js',

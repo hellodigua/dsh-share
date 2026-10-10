@@ -16,9 +16,9 @@ interface ShareRuntimeInjected {
 export type ShareActionProps = PropsRuntime<'conversation.chat.assistant-actions'> & InjectFace<ShareRuntimeInjected>;
 export type ShareConversationActionProps = PropsRuntime<'conversation.session.header.utilities'> & InjectFace<ShareRuntimeInjected>;
 /** 官方 assistant-actions 插槽中的分享入口。 */
-export declare function ShareAction({ sessionId, shareRuntime, useShareLocale, }: ShareActionProps): ReactElement;
+export declare function ShareAction({ sessionId, shareRuntime, useShareLocale, useSessions, }: ShareActionProps): ReactElement;
 /** 官方 Session Header 右侧 utilities 插槽中的多轮分享入口。 */
-export declare function ShareConversationAction({ sessionId, shareRuntime, useShareLocale, useShareSelection, }: ShareConversationActionProps): ReactElement;
+export declare function ShareConversationAction({ sessionId, shareRuntime, useShareLocale, useShareSelection, useSessions, }: ShareConversationActionProps): ReactElement;
 export declare function apply(ctx: Context): void;
 export { createShareCard } from './card.ts';
 export { createShareMarkdown } from './markdown.ts';

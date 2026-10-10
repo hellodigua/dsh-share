@@ -17,7 +17,7 @@ export interface ShareRuntime {
     readonly document: Document;
     getLocale(): ShareLocale;
     selectionFor(sessionId: string): ObservableSnapshot<ShareSelectionSnapshot>;
-    enterSelection(sessionId: string, source?: HTMLElement, initialTurn?: number): void;
+    enterSelection(sessionId: string, source?: HTMLElement, initialTurn?: number, title?: string): void;
     cancelSelection(sessionId: string): void;
     toggleSelection(sessionId: string, turnId: string): void;
     openSelected(sessionId: string): void;

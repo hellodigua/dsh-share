@@ -27,6 +27,12 @@ export interface Translation {
   pageNumber(current: number, total: number): string
   download: string
   downloadMarkdown: string
+  downloadHtml: string
+  downloadFile: string
+  downloadFormat: string
+  htmlExporting: string
+  htmlExportFailed: string
+  htmlMissingImages: string
   downloadMarkdownCompact: string
   copied: string
   copyUnsupported: string
@@ -75,6 +81,12 @@ export function t(locale: ShareLocale): Translation {
       pageNumber: (current, total) => `第 ${current} / ${total} 张`,
       download: '下载图片',
       downloadMarkdown: '下载 Markdown',
+      downloadHtml: '下载 HTML',
+      downloadFile: '下载',
+      downloadFormat: '下载格式',
+      htmlExporting: '正在生成 HTML…',
+      htmlExportFailed: 'HTML 生成失败，请重试。',
+      htmlMissingImages: '部分图片无法内嵌，已在 HTML 中标记。',
       downloadMarkdownCompact: '下载MD',
       copied: '图片已复制',
       copyUnsupported: '当前浏览器不支持复制图片，请下载 PNG。',
@@ -118,6 +130,12 @@ export function t(locale: ShareLocale): Translation {
     pageNumber: (current, total) => `${current} / ${total}`,
     download: 'Download image',
     downloadMarkdown: 'Download Markdown',
+    downloadHtml: 'Download HTML',
+    downloadFile: 'Download',
+    downloadFormat: 'Download format',
+    htmlExporting: 'Generating HTML…',
+    htmlExportFailed: 'Could not generate HTML. Please try again.',
+    htmlMissingImages: 'Some images could not be embedded and are marked in the HTML.',
     downloadMarkdownCompact: 'Markdown',
     copied: 'Image copied',
     copyUnsupported: 'Image clipboard is unavailable. Please download the PNG.',

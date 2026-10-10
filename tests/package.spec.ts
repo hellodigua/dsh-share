@@ -98,7 +98,7 @@ describe('DSH 插件清单', () => {
     const config = await readFile(new URL('../tsdown.config.ts', import.meta.url), 'utf8')
     expect(config).toContain("onlyBundle: ['html-to-image', 'turndown', 'turndown-plugin-gfm']")
     expect(config).toContain(
-      "neverBundle: ['react', '@deepseek-ai/dsh-client-ui-primitives', '@mixmark-io/domino']",
+      "neverBundle: ['react', 'react-dom', 'react-dom/client', '@deepseek-ai/dsh-client-ui-primitives', '@mixmark-io/domino']",
     )
   })
 

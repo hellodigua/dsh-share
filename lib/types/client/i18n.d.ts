@@ -23,6 +23,12 @@ export interface Translation {
     pageNumber(current: number, total: number): string;
     download: string;
     downloadMarkdown: string;
+    downloadHtml: string;
+    downloadFile: string;
+    downloadFormat: string;
+    htmlExporting: string;
+    htmlExportFailed: string;
+    htmlMissingImages: string;
     downloadMarkdownCompact: string;
     copied: string;
     copyUnsupported: string;

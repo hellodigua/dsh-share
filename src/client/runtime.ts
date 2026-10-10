@@ -12,9 +12,12 @@ import {
 } from './dom.ts'
 import { getDocumentLocale, t, type ShareLocale } from './i18n.ts'
 import { createShareMarkdown } from './markdown.ts'
+import { createShareHtml } from './html.ts'
+import { mountDownloadFormat, type DownloadFormat } from './download-format.ts'
 import {
   PreviewDialog,
   downloadMarkdownFile,
+  downloadHtmlFile,
   renderShareImage,
   type ImageRenderer,
 } from './preview-dialog.ts'
@@ -52,9 +55,11 @@ interface SelectableTurn {
 }
 
 interface SessionSelection extends ObservableSnapshot<ShareSelectionSnapshot> {
+  title?: string
   available: Map<string, SelectableTurn>
   contentClickHandler?: EventListener
   footer?: HTMLElement
+  downloadFormat?: ReturnType<typeof mountDownloadFormat>
   listeners: Set<() => void>
   observer?: MutationObserver
   refreshScheduled: boolean
@@ -71,7 +76,7 @@ export interface ShareRuntime {
   readonly document: Document
   getLocale(): ShareLocale
   selectionFor(sessionId: string): ObservableSnapshot<ShareSelectionSnapshot>
-  enterSelection(sessionId: string, source?: HTMLElement, initialTurn?: number): void
+  enterSelection(sessionId: string, source?: HTMLElement, initialTurn?: number, title?: string): void
   cancelSelection(sessionId: string): void
   toggleSelection(sessionId: string, turnId: string): void
   openSelected(sessionId: string): void
@@ -157,6 +162,7 @@ export function createShareRuntime(document: Document, options: InstallOptions =
   const renderImage = options.renderImage ?? renderShareImage
   const currentLocale = options.getLocale ?? (() => getDocumentLocale(document))
   let activeContent: readonly ShareMessage[] | undefined
+  let activeTitle: string | undefined
   let activeGroupCount = 0
   let renderEpoch = 0
   let pendingRender: RenderRequest | undefined
@@ -224,7 +230,7 @@ export function createShareRuntime(document: Document, options: InstallOptions =
       const allLabel = controller.footer.querySelector<HTMLElement>('[data-dsh-share-select-all-label]')
       const count = controller.footer.querySelector<HTMLElement>('[data-dsh-share-selection-count]')
       const cancel = controller.footer.querySelector<HTMLButtonElement>('[data-dsh-share-selection-cancel]')
-      const markdown = controller.footer.querySelector<HTMLButtonElement>('[data-dsh-share-selection-markdown]')
+      const download = controller.footer.querySelector<HTMLButtonElement>('[data-dsh-share-selection-download]')
       const create = controller.footer.querySelector<HTMLButtonElement>('[data-dsh-share-selection-create]')
       if (all) {
         all.setAttribute('aria-checked', String(controller.snapshot.allSelected))
@@ -235,13 +241,14 @@ export function createShareRuntime(document: Document, options: InstallOptions =
       // footer 位于被观察的会话区域内；仅在文案变化时写入，避免自身触发 MutationObserver 循环。
       if (count && count.textContent !== nextCount) count.textContent = nextCount
       if (cancel && cancel.textContent !== strings.cancelSelection) cancel.textContent = strings.cancelSelection
-      if (markdown) {
-        updateResponsiveLabel(markdown, strings.downloadMarkdown, strings.downloadMarkdownCompact)
-      }
+      if (download) updateResponsiveLabel(download, strings.downloadFile, strings.downloadFile)
       if (create) {
         updateResponsiveLabel(create, strings.createSelection, strings.createSelectionCompact)
       }
-      if (markdown) markdown.disabled = controller.selected.size === 0
+      if (download) {
+        download.disabled = controller.selected.size === 0 || download.dataset.busy === 'true'
+        controller.downloadFormat?.update(currentLocale(), download.disabled)
+      }
       if (create) create.disabled = controller.selected.size === 0
     }
   }
@@ -281,6 +288,8 @@ export function createShareRuntime(document: Document, options: InstallOptions =
     controller.observer = undefined
     controller.resizeObserver?.disconnect()
     controller.resizeObserver = undefined
+    controller.downloadFormat?.dispose()
+    controller.downloadFormat = undefined
     controller.footer?.remove()
     controller.footer = undefined
     if (scroll) {
@@ -499,19 +508,6 @@ export function createShareRuntime(document: Document, options: InstallOptions =
     cancel.textContent = strings.cancelSelection
     cancel.addEventListener('click', () => resetSelection(controller))
 
-    const markdown = makeButton(document, 'dshShareSelectionMarkdown')
-    appendResponsiveLabel(
-      document,
-      markdown,
-      strings.downloadMarkdown,
-      strings.downloadMarkdownCompact,
-    )
-    markdown.addEventListener('click', () => {
-      const messages = selectedTurnsToShareMessages(controller.selected.values())
-      if (messages.length === 0) return
-      downloadMarkdownFile(document, createShareMarkdown(messages, currentLocale(), ensureDialog().settings))
-    })
-
     const create = makeButton(document, 'dshShareSelectionCreate')
     appendResponsiveLabel(
       document,
@@ -523,11 +519,52 @@ export function createShareRuntime(document: Document, options: InstallOptions =
       const messages = selectedTurnsToShareMessages(controller.selected.values())
       if (messages.length === 0) return
       activeContent = messages
+      activeTitle = controller.title
       activeGroupCount = controller.selected.size
       void renderContent(messages, activeGroupCount)
     })
 
-    inner.append(selectAll, divider, count, cancel, markdown, create)
+    const downloadGroup = document.createElement('div')
+    downloadGroup.dataset.dshShareDownloadGroup = ''
+    const download = makeButton(document, 'dshShareSelectionDownload')
+    appendResponsiveLabel(document, download, strings.downloadFile, strings.downloadFile)
+    const formatMount = document.createElement('span')
+    let format: DownloadFormat = 'markdown'
+    controller.downloadFormat = mountDownloadFormat(formatMount, value => { format = value })
+    controller.downloadFormat.update(currentLocale(), controller.selected.size === 0)
+    downloadGroup.append(download, formatMount)
+    const htmlStatus = document.createElement('span')
+    htmlStatus.role = 'status'
+    htmlStatus.dataset.dshShareHtmlStatus = ''
+    download.addEventListener('click', async () => {
+      if (download.dataset.busy === 'true') return
+      const messages = selectedTurnsToShareMessages(controller.selected.values())
+      if (!messages.length) return
+      const locale = currentLocale()
+      const title = controller.title
+      if (format === 'markdown') {
+        downloadMarkdownFile(document, createShareMarkdown(messages, locale, ensureDialog().settings), title)
+        htmlStatus.textContent = ''
+        return
+      }
+      download.dataset.busy = 'true'
+      download.disabled = true
+      controller.downloadFormat?.update(locale, true)
+      htmlStatus.textContent = t(locale).htmlExporting
+      try {
+        const result = await createShareHtml(document, messages, locale, ensureDialog().settings)
+        if (!footer.isConnected) return
+        downloadHtmlFile(document, result.html, title)
+        htmlStatus.textContent = result.missingImages ? t(currentLocale()).htmlMissingImages : ''
+      } catch {
+        if (footer.isConnected) htmlStatus.textContent = t(currentLocale()).htmlExportFailed
+      } finally {
+        delete download.dataset.busy
+        download.disabled = controller.selected.size === 0
+        if (controller.footer === footer) controller.downloadFormat?.update(currentLocale(), download.disabled)
+      }
+    })
+    inner.append(selectAll, divider, count, cancel, downloadGroup, create, htmlStatus)
     footer.append(inner)
     return footer
   }
@@ -627,6 +664,7 @@ export function createShareRuntime(document: Document, options: InstallOptions =
   function ensureDialog(): PreviewDialog {
     if (dialog) return dialog
     dialog = new PreviewDialog(document, {
+      getConversationTitle: () => activeTitle,
       getLocale: currentLocale,
       onSettingsChange: () => {
         if (activeContent) scheduleSettingsRender(activeContent, activeGroupCount)
@@ -649,13 +687,14 @@ export function createShareRuntime(document: Document, options: InstallOptions =
     }
   }
 
-  const enterSelection = (sessionId: string, source?: HTMLElement, initialTurn?: number): void => {
+  const enterSelection = (sessionId: string, source?: HTMLElement, initialTurn?: number, title?: string): void => {
     for (const [id, other] of selections) {
       if (id !== sessionId && other.snapshot.active) resetSelection(other)
     }
     const controller = selectionFor(sessionId)
     if (controller.snapshot.active) return
     resetSelection(controller)
+    controller.title = title
     const root = source?.closest<HTMLElement>('[data-phase]')
     const scroll = root?.querySelector<HTMLElement>('[data-conversation-scroll]')
       ?? document.querySelector<HTMLElement>('[data-conversation-scroll]')
@@ -669,6 +708,7 @@ export function createShareRuntime(document: Document, options: InstallOptions =
         turn: selected.turn,
       }])
       activeContent = messages
+      activeTitle = controller.title
       activeGroupCount = 1
       void renderContent(messages, activeGroupCount)
       return
@@ -728,6 +768,7 @@ export function createShareRuntime(document: Document, options: InstallOptions =
       const messages = selectedTurnsToShareMessages(controller.selected.values())
       if (messages.length === 0) return
       activeContent = messages
+      activeTitle = controller.title
       activeGroupCount = controller.selected.size
       void renderContent(messages, activeGroupCount)
     },
