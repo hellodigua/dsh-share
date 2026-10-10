@@ -58,7 +58,7 @@ export async function renderShareImage(element: HTMLElement): Promise<Blob | Blo
 
 function createFilename(extension: 'png' | 'md', now = new Date()): string {
   const pad = (number: number): string => String(number).padStart(2, '0')
-  return `dsh-share-${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}.${extension}`
+  return `dsh-${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}.${extension}`
 }
 
 export function downloadMarkdownFile(document: Document, markdown: string): void {

@@ -624,7 +624,7 @@ describe('分享按钮运行时', () => {
     expect(markdownButton.disabled).toBe(false)
     markdownButton.click()
     expect(createdBlobs.some(blob => blob.type.startsWith('text/markdown'))).toBe(true)
-    expect(downloadedFilename).toMatch(/^dsh-share-\d{8}-\d{6}\.md$/)
+    expect(downloadedFilename).toMatch(/^dsh-\d{8}-\d{6}\.md$/)
 
     ;(fixture.scroll.querySelector('[data-dsh-share-selection-create]') as HTMLButtonElement).click()
 
