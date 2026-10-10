@@ -1,3 +1,5 @@
+import { saveExportTheme } from './export-theme.ts'
+
 export const TURN_TAIL_SELECTOR = '[data-turn-tail]'
 export const TURN_FLOW_SELECTOR = '[data-chat-flow-kind="turn-tail"]'
 
@@ -14,7 +16,11 @@ export interface RenderedTurn {
 
 /** 立即克隆消息节点，后续滚动卸载原 DOM 也不会影响导出。 */
 export function snapshotElements(elements: readonly HTMLElement[]): HTMLElement[] {
-  return elements.map(element => element.cloneNode(true) as HTMLElement)
+  return elements.map(element => {
+    const snapshot = element.cloneNode(true) as HTMLElement
+    saveExportTheme(element, snapshot)
+    return snapshot
+  })
 }
 
 /**
