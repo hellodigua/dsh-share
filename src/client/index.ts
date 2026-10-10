@@ -48,6 +48,8 @@ export function ShareAction({
         const turnValue = event.currentTarget.closest<HTMLElement>('[data-turn-tail]')?.dataset.turnTail
         const turn = Number(turnValue)
         if (turnValue === undefined || !Number.isFinite(turn)) return
+        // Pointer activation must not become the dialog's focus-return target.
+        if (event.detail > 0) event.currentTarget.blur()
         shareRuntime.enterSelection(String(sessionId), event.currentTarget, turn)
       },
     },
@@ -68,6 +70,7 @@ export function ShareConversationAction({
       'data-dsh-share-conversation': '',
       'aria-label': strings.shareConversation,
       onClick: (event: ReactMouseEvent<HTMLButtonElement>) => {
+        if (event.detail > 0) event.currentTarget.blur()
         shareRuntime.enterSelection(String(sessionId), event.currentTarget)
       },
     }, createElement(IconShareOutlineRegular, { size: 16 }))
