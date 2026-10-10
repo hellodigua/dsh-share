@@ -48,7 +48,7 @@ describe('分享图片卡片', () => {
       for (const cell of table.querySelectorAll('th, td')) {
         const computed = getComputedStyle(cell)
         expect(computed.maxWidth).toBe('100%')
-        expect(computed.whiteSpace).toBe('normal')
+        expect(computed.whiteSpace).toBe('pre-line')
         expect(computed.height).toBe('auto')
         expect(computed.verticalAlign).toBe('top')
         expect(computed.overflowWrap).toBe('anywhere')
@@ -56,8 +56,35 @@ describe('分享图片卡片', () => {
       for (const row of table.rows) expect(getComputedStyle(row).height).toBe('auto')
       const pageCopy = card.element.cloneNode(true) as HTMLElement
       card.element.after(pageCopy)
-      expect(getComputedStyle(pageCopy.querySelector('td')!).whiteSpace).toBe('normal')
+      expect(getComputedStyle(pageCopy.querySelector('td')!).whiteSpace).toBe('pre-line')
       pageCopy.remove()
+    } finally {
+      card.dispose()
+      style.remove()
+    }
+  })
+
+  it.each(['pre-wrap', 'pre-line'])('保留 %s 单元格的显式换行及 br，并允许副本自动折行', (whiteSpace) => {
+    const style = document.createElement('style')
+    style.textContent = `.source-table :is(th, td) { white-space: ${whiteSpace}; }\n` + STYLE_TEXT
+    document.head.append(style)
+    const source = document.createElement('div')
+    source.innerHTML = '<table class="source-table"><tr><th>标题\n说明</th><td>第一行\n第二行\n\n第三行<br>第四行</td></tr></table>'
+    document.body.append(source)
+    const card = createShareCard(document, [{ role: 'assistant', turn: 1, order: 1, omittedBefore: 0, elements: [source] }], 'zh')
+    try {
+      expect(getComputedStyle(source.querySelector('td')!).whiteSpace).toBe(whiteSpace)
+      const pageCopy = card.element.cloneNode(true) as HTMLElement
+      card.element.after(pageCopy)
+      for (const copy of [card.element, pageCopy]) {
+        for (const tag of ['th', 'td']) {
+          const cell = copy.querySelector(tag)!
+          expect(cell.textContent).toBe(source.querySelector(tag)!.textContent)
+          expect(getComputedStyle(cell).whiteSpace).toBe('pre-line')
+          expect(getComputedStyle(cell).overflowWrap).toBe('anywhere')
+        }
+        expect(copy.querySelectorAll('td br')).toHaveLength(1)
+      }
     } finally {
       card.dispose()
       style.remove()

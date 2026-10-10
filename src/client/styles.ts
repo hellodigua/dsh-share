@@ -492,7 +492,7 @@ div:has([data-dsh-share-button]) > span { order: 2; }
   overflow-wrap: anywhere !important;
   padding: 8px 6px !important;
   word-break: break-word !important;
-  white-space: normal !important;
+  white-space: pre-line !important;
   height: auto !important;
   vertical-align: top !important;
 }
