@@ -146,6 +146,30 @@ afterEach(() => {
 })
 
 describe('分享按钮运行时', () => {
+  it.each([
+    ['消息', 1, false],
+    ['消息', 0, true],
+    ['Header', 1, false],
+    ['Header', 0, true],
+  ] as const)('%s 入口 detail=%s 时在打开分享前保留焦点=%s', (entry, detail, keepFocus) => {
+    const fixture = createConversation()
+    const tail = addTurn(fixture, 'one', 1)
+    const runtime = createShareRuntime(document)
+    const source = entry === 'Header' ? fixture.source : document.createElement('button')
+    if (entry === '消息') tail.append(source)
+    const enter = vi.spyOn(runtime, 'enterSelection').mockImplementation(() => {
+      expect(document.activeElement === source).toBe(keepFocus)
+    })
+    const tooltip = entry === 'Header'
+      ? ShareConversationAction(headerProps(runtime))
+      : ShareAction(actionProps(runtime))
+    source.focus()
+    expect(document.activeElement).toBe(source)
+    tooltip.props.children.props.onClick({ currentTarget: source, detail })
+    expect(enter).toHaveBeenCalledWith('session-1', source, ...(entry === '消息' ? [1] : []))
+    runtime.dispose()
+  })
+
   it('通过官方消息与 Header 插槽注册双入口，并在卸载时清理', () => {
     const fixture = createConversation()
     addTurn(fixture, 'one', 1)
