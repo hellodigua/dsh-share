@@ -1,4 +1,5 @@
 import { shareExportBackground } from './background.ts'
+import { applyExportTheme } from './export-theme.ts'
 import type { ShareMessage } from './content.ts'
 import {
   DEFAULT_SHARE_SETTINGS,
@@ -289,6 +290,7 @@ export function createShareCard(
   })
   card.append(footer)
 
+  applyExportTheme(card, messages.flatMap(message => message.elements))
   host.append(card)
   document.body.append(host)
   // 皮肤可能把 --dsw-alias-bg-base 设成 transparent；分享图需要不透明底色。
