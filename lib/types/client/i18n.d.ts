@@ -17,6 +17,7 @@ export interface Translation {
     copy: string;
     copyPage: string;
     downloadPage: string;
+    downloadAll: string;
     previousPage: string;
     nextPage: string;
     pageNumber(current: number, total: number): string;

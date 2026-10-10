@@ -1,6 +1,7 @@
 import { toBlob } from 'html-to-image'
 import { shareExportBackground } from './background.ts'
 import { t, type ShareLocale, type Translation } from './i18n.ts'
+import { createSharePages } from './pagination.ts'
 import {
   loadDirectSingleTurn,
   loadShareSettings,
@@ -15,44 +16,49 @@ import {
 const TRANSPARENT_IMAGE_PLACEHOLDER =
   'data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs='
 
+// 保守导出预算，不代表浏览器硬上限；倍率不足以容纳完整内容时明确失败。
+const MAX_IMAGE_SIDE = 32767
+const MAX_IMAGE_AREA = 32 * 1024 * 1024
+const IMAGE_PIXEL_RATIOS = [2, 1, 0.5] as const
+
 export type ImageRenderer = (element: HTMLElement) => Promise<Blob | Blob[]>
 
 export async function renderShareImage(element: HTMLElement): Promise<Blob | Blob[]> {
   const options = {
     backgroundColor: shareExportBackground(element),
     imagePlaceholder: TRANSPARENT_IMAGE_PLACEHOLDER,
-    pixelRatio: 2,
     skipFonts: true,
     skipAutoScale: true,
   }
-  const height = Math.ceil(element.getBoundingClientRect().height)
-  const width = Math.ceil(element.getBoundingClientRect().width)
-  // 每页限制画布高度及面积，避免超长图自动缩小或超大画布编码失败。
-  const pageHeight = 4096
-  if (height <= pageHeight) {
-    const blob = await toBlob(element, options)
-    if (!blob) throw new Error('html-to-image returned an empty blob')
-    return blob
-  }
-  const viewport = element.ownerDocument.createElement('div')
-  Object.assign(viewport.style, { width: `${width}px`, overflow: 'hidden', position: 'relative' })
-  const copy = element.cloneNode(true) as HTMLElement
-  Object.assign(copy.style, { margin: '0', width: `${width}px`, transformOrigin: 'top left' })
-  viewport.append(copy)
-  element.after(viewport)
-  const pages: Blob[] = []
+  const cards = await createSharePages(element)
+  const images: Blob[] = []
   try {
-    for (let offset = 0; offset < height; offset += pageHeight) {
-      const sliceHeight = Math.min(pageHeight, height - offset)
-      viewport.style.height = `${sliceHeight}px`
-      copy.style.transform = `translateY(-${offset}px)`
-      const blob = await toBlob(viewport, { ...options, width, height: sliceHeight })
-      if (!blob) throw new Error('html-to-image returned an empty page')
-      pages.push(blob)
+    for (const card of cards.elements) {
+      const rect = card.getBoundingClientRect()
+      const width = Math.ceil(rect.width)
+      const height = Math.ceil(rect.height)
+      let blob: Blob | null = null
+      let cause: unknown
+      for (const pixelRatio of IMAGE_PIXEL_RATIOS) {
+        const imageWidth = Math.floor(width * pixelRatio)
+        const imageHeight = Math.floor(height * pixelRatio)
+        if (!Number.isFinite(imageWidth) || !Number.isFinite(imageHeight)
+          || imageWidth < 1 || imageHeight < 1
+          || imageWidth > MAX_IMAGE_SIDE || imageHeight > MAX_IMAGE_SIDE
+          || imageWidth * imageHeight > MAX_IMAGE_AREA) continue
+        try {
+          blob = await toBlob(card, { ...options, width, height, pixelRatio })
+          if (blob?.size) break
+        } catch (error) {
+          cause = error
+        }
+      }
+      if (!blob?.size) throw new Error('Could not render a complete image within the export budget', { cause })
+      images.push(blob)
     }
-    return pages
+    return images.length === 1 ? images[0]! : images
   } finally {
-    viewport.remove()
+    cards.dispose()
   }
 }
 
@@ -85,6 +91,7 @@ export class PreviewDialog {
   private readonly status: HTMLElement
   private readonly copyButton: HTMLButtonElement
   private readonly downloadButton: HTMLButtonElement
+  private readonly downloadAllButton: HTMLButtonElement
   private readonly directSingleTurnInput: HTMLInputElement
   private readonly hideProcessInput: HTMLInputElement
   private readonly choiceButtons: HTMLButtonElement[]
@@ -155,6 +162,7 @@ export class PreviewDialog {
         </span>
         <span class="dsh-share-dialog__status" data-dsh-share-status role="status"></span>
         <button class="dsh-share-dialog__action" data-dsh-share-download type="button"></button>
+        <button class="dsh-share-dialog__action" data-dsh-share-download-all type="button" hidden disabled></button>
         <button class="dsh-share-dialog__action dsh-share-dialog__action--primary" data-dsh-share-copy type="button"></button>
       </div>`
 
@@ -171,6 +179,7 @@ export class PreviewDialog {
     this.nextPage.addEventListener('click', () => this.selectPage(this.pageIndex + 1))
     this.copyButton = dialog.querySelector('[data-dsh-share-copy]') as HTMLButtonElement
     this.downloadButton = dialog.querySelector('[data-dsh-share-download]') as HTMLButtonElement
+    this.downloadAllButton = dialog.querySelector('[data-dsh-share-download-all]') as HTMLButtonElement
     this.directSingleTurnInput = dialog.querySelector('[data-dsh-share-direct-single-turn]') as HTMLInputElement
     this.hideProcessInput = dialog.querySelector('[data-dsh-share-hide-process]') as HTMLInputElement
 
@@ -211,6 +220,7 @@ export class PreviewDialog {
     close.ariaLabel = strings.close
     this.copyButton.textContent = strings.copy
     this.downloadButton.textContent = strings.download
+    this.downloadAllButton.textContent = strings.downloadAll
 
     close.addEventListener('click', () => this.close())
     dialog.addEventListener('click', (event) => {
@@ -222,6 +232,7 @@ export class PreviewDialog {
     })
     this.copyButton.addEventListener('click', () => void this.copy())
     this.downloadButton.addEventListener('click', () => this.download())
+    this.downloadAllButton.addEventListener('click', () => this.downloadAll())
     this.directSingleTurnInput.addEventListener('change', () => {
       this.currentDirectSingleTurn = this.directSingleTurnInput.checked
       saveDirectSingleTurn(this.storage, this.currentDirectSingleTurn)
@@ -279,6 +290,7 @@ export class PreviewDialog {
     }
     this.copyButton.textContent = strings.copy
     this.downloadButton.textContent = strings.download
+    this.downloadAllButton.textContent = strings.downloadAll
     if (this.pages.length) this.selectPage(this.pageIndex)
     return strings
   }
@@ -294,6 +306,7 @@ export class PreviewDialog {
     this.element.ariaBusy = 'true'
     this.copyButton.disabled = true
     this.downloadButton.disabled = true
+    this.downloadAllButton.disabled = true
 
     if (canPreserve) {
       this.message.hidden = true
@@ -318,6 +331,7 @@ export class PreviewDialog {
     this.element.ariaBusy = 'true'
     this.copyButton.disabled = true
     this.downloadButton.disabled = true
+    this.downloadAllButton.disabled = true
     if (canPreserve) {
       this.message.hidden = true
       this.image.hidden = false
@@ -366,6 +380,7 @@ export class PreviewDialog {
     this.element.ariaBusy = 'false'
     this.copyButton.disabled = false
     this.downloadButton.disabled = false
+    this.downloadAllButton.disabled = false
 
     // 新图已进入解码缓存；延后一帧释放旧 URL，保证浏览器完成原位绘制。
     await this.nextFrame()
@@ -382,6 +397,7 @@ export class PreviewDialog {
     this.status.textContent = ''
     const strings = t(this.options.getLocale())
     this.pager.hidden = this.pages.length <= 1
+    this.downloadAllButton.hidden = this.pages.length <= 1
     this.previousPage.textContent = strings.previousPage
     this.nextPage.textContent = strings.nextPage
     this.previousPage.disabled = index === 0
@@ -401,6 +417,7 @@ export class PreviewDialog {
       this.status.textContent = strings.updateFailed
       this.copyButton.disabled = false
       this.downloadButton.disabled = false
+      this.downloadAllButton.disabled = false
       this.open()
       return
     }
@@ -411,6 +428,7 @@ export class PreviewDialog {
     this.image.hidden = true
     this.copyButton.disabled = true
     this.downloadButton.disabled = true
+    this.downloadAllButton.disabled = true
     this.open()
   }
 
@@ -492,6 +510,8 @@ export class PreviewDialog {
     this.pageUrls = []
     this.pages = []
     this.pager.hidden = true
+    this.downloadAllButton.hidden = true
+    this.downloadAllButton.disabled = true
     this.objectUrl = undefined
     this.image.removeAttribute('src')
     this.status.textContent = ''
@@ -525,6 +545,18 @@ export class PreviewDialog {
       ? createFilename('png').replace('.png', `-${this.pageIndex + 1}-of-${this.pages.length}.png`)
       : createFilename('png')
     anchor.click()
+  }
+
+  /** 使用同一时间戳按页序下载，不改变当前预览页。 */
+  private downloadAll(): void {
+    if (this.downloadAllButton.disabled || this.pageUrls.length < 2) return
+    const filename = createFilename('png')
+    this.pageUrls.forEach((url, index) => {
+      const anchor = this.document.createElement('a')
+      anchor.href = url
+      anchor.download = filename.replace('.png', `-${index + 1}-of-${this.pageUrls.length}.png`)
+      anchor.click()
+    })
   }
 
 }

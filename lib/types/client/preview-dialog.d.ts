@@ -18,6 +18,7 @@ export declare class PreviewDialog {
     private readonly status;
     private readonly copyButton;
     private readonly downloadButton;
+    private readonly downloadAllButton;
     private readonly directSingleTurnInput;
     private readonly hideProcessInput;
     private readonly choiceButtons;
@@ -56,6 +57,8 @@ export declare class PreviewDialog {
     private clearImageResult;
     private copy;
     private download;
+    /** 使用同一时间戳按页序下载，不改变当前预览页。 */
+    private downloadAll;
 }
 export {};
 //# sourceMappingURL=preview-dialog.d.ts.map

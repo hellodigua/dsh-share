@@ -19,7 +19,8 @@ Adjust the image width, font size, and process visibility before downloading or 
 - Shows linked checkboxes beside both the question and answer, lets you click content to select a group, and supports non-contiguous selection
 - Keeps a checkbox visible while scrolling through long content, then lets it leave at that question or answer's boundary
 - Supports image copy, PNG download, and Markdown download
-- Content taller than 4096 CSS pixels is split into multiple PNGs, with per-page preview, copy, and download. Page boundaries may split text or images.
+- Packs complete Q&A groups in order into PNGs: while the current page is below 4096 CSS pixels, it accepts the next complete group; a new page starts once the target is reached or exceeded. Supports per-page preview, copy, and download, plus downloading all pages as separate, numbered PNGs. Browsers may require permission for multiple downloads; desktop may prompt to save each file. A final page containing just one group and measuring less than 1024 CSS pixels is merged into the previous page. Selecting only one group keeps a single page. Pages may exceed the target height without cropping content.
+- Exports at 2× resolution by default, trying 1× or 0.5× for oversized images or failed renders while keeping the full content. If generation still fails, an error suggests reducing the font size or content, or exporting Markdown.
 - Preserves Markdown, code blocks, tables, images, and tool call summaries
 - Supports adjustable image widths and font sizes, with a scrollable preview for long images
 - Can hide reasoning and tool calls, leaving only the question and final answer
